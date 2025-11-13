@@ -1,10 +1,12 @@
 let shapes = [];
 let buildArea = { x: 50, y: 50, w: 800, h: 100 };
 let resetButton;
+let nextClickIndex = 0; // for ordering clones
 
 function setup() {
   createCanvas(1600, 1400);
   textAlign(CENTER, CENTER);
+  textSize(20);
   rectMode(CORNER);
   noStroke();
 
@@ -27,7 +29,7 @@ function addShapes() {
       h,
       color,
       label,
-      inBox: false,
+      inBox: false,         // only clones will be true
       homeX: x,
       homeY: y,
       targetX: x,
@@ -35,10 +37,12 @@ function addShapes() {
       scale: 1,
       targetScale: 1,
       originalColor: color,
+      isBase: true,         // originals are base tiles (never removed)
+      clickIndex: null      // used for clones only
     });
   }
 
-  // 🔤 Sample letters (add your full set here)
+  // Example subset — reinsert your full set here (kept identical)
   addShape(40, 300, 40, 40, 'lightyellow', 'a');
   addShape(90, 300, 40, 40, 'white', 'b');
   addShape(140, 300, 40, 40, 'white', 'c');
@@ -52,11 +56,11 @@ function addShapes() {
   addShape(540, 300, 40, 40, 'white', 'k');
   addShape(590, 300, 40, 40, 'white', 'l');
   addShape(640, 300, 40, 40, 'white', 'm');
-addShape(40, 350, 40, 40, 'white', 'n');
+  addShape(40, 350, 40, 40, 'white', 'n');
   addShape(90, 350, 40, 40, 'lightyellow', 'o');
   addShape(140, 350, 40, 40, 'white', 'p');
   addShape(190, 350, 40, 40, 'white', 'q');
- addShape(240, 350, 40, 40, 'white', 'r');
+  addShape(240, 350, 40, 40, 'white', 'r');
   addShape(290, 350, 40, 40, 'white', 's');
   addShape(340, 350, 40, 40, 'white', 't');
   addShape(390, 350, 40, 40, 'lightyellow', 'u');
@@ -182,45 +186,45 @@ addShape(40, 350, 40, 40, 'white', 'n');
   addShape(185, 950, 60, 40, 'lightyellow', 'ur');
   addShape(255, 950, 60, 40, 'lightyellow', 'ar');
   addShape(325, 950, 60, 40, 'lightyellow', 'or');
- addShape(40, 500, 60, 40, 'white', '-by');
-addShape(115, 500, 60, 40, 'white', '-vy');
-addShape(185, 500, 60, 40, 'white', '-zy');
-addShape(255, 500, 60, 40, 'white', '-ky');
-addShape(325, 500, 60, 40, 'white', '-ly');
-addShape(395, 500, 60, 40, 'white', '-ny');
-addShape(465, 500, 60, 40, 'white', '-dy');
-addShape(535, 500, 60, 40, 'white', '-fy');
-addShape(600, 500, 60, 40, 'white', '-py');
-addShape(670, 500, 60, 40, 'white', '-sy');
-addShape(670, 450, 60, 40, 'white', '-ty');
-addShape(255, 1000, 60, 40, 'lightyellow', 'ou');
-addShape(325, 1000, 60, 40, 'lightyellow', 'ow');
-addShape(395, 1000, 60, 40, 'lightyellow', 'oi');
-addShape(465, 1000, 60, 40, 'lightyellow', '-oy');
-addShape(535, 1000, 60, 40, 'lightyellow', 'igh');
-addShape(600, 1000, 60, 40, 'lightyellow', 'au');
-addShape(675, 1000, 60, 40, 'lightyellow', 'aw');
-addShape(1000, 300, 60, 40, 'lightgreen', '-ed');
-addShape(825, 1000, 60, 40, 'lightyellow', 'oo');
-addShape(920, 300, 60, 40, 'lightgreen', '-ic');
-addShape(40, 1050, 60, 40, 'lightyellow', 'eigh');
-addShape(1000, 500, 60, 40, 'lightgreen', '-tion');
-addShape(775, 500, 60, 40, 'lightgreen', '-sion');
-addShape(255, 1050, 60, 40, 'lightyellow', 'augh');
-addShape(325, 1050, 60, 40, 'lightyellow', 'ei');
-addShape(395, 1050, 60, 40, 'lightyellow', '-ew');
-addShape(465, 1050, 60, 40, 'lightyellow', '-ey');
-addShape(535, 1050, 60, 40, 'lightyellow', 'ie');
-addShape(600, 1050, 60, 40, 'lightyellow', 'ough');
-addShape(675, 1050, 60, 40, 'lightyellow', '-ue');
-addShape(750, 1050, 60, 40, 'lightyellow', 'ui');
-addShape(825, 1050, 60, 40, 'white', 'war');
-addShape(900, 1050, 60, 40, 'white', 'wor');
-addShape(40, 1100, 60, 40, 'white', 'gn');
-addShape(115, 1100, 60, 40, 'white', 'kn-');
-addShape(185, 1100, 60, 40, 'white', '-mb');
-addShape(255, 1100, 60, 40, 'white', '-mn');
-addShape(325, 1100, 60, 40, 'white', 'wr-');
+  addShape(40, 500, 60, 40, 'white', '-by');
+  addShape(115, 500, 60, 40, 'white', '-vy');
+  addShape(185, 500, 60, 40, 'white', '-zy');
+  addShape(255, 500, 60, 40, 'white', '-ky');
+  addShape(325, 500, 60, 40, 'white', '-ly');
+  addShape(395, 500, 60, 40, 'white', '-ny');
+  addShape(465, 500, 60, 40, 'white', '-dy');
+  addShape(535, 500, 60, 40, 'white', '-fy');
+  addShape(600, 500, 60, 40, 'white', '-py');
+  addShape(670, 500, 60, 40, 'white', '-sy');
+  addShape(670, 450, 60, 40, 'white', '-ty');
+  addShape(255, 1000, 60, 40, 'lightyellow', 'ou');
+  addShape(325, 1000, 60, 40, 'lightyellow', 'ow');
+  addShape(395, 1000, 60, 40, 'lightyellow', 'oi');
+  addShape(465, 1000, 60, 40, 'lightyellow', '-oy');
+  addShape(535, 1000, 60, 40, 'lightyellow', 'igh');
+  addShape(600, 1000, 60, 40, 'lightyellow', 'au');
+  addShape(675, 1000, 60, 40, 'lightyellow', 'aw');
+  addShape(1000, 300, 60, 40, 'lightgreen', '-ed');
+  addShape(825, 1000, 60, 40, 'lightyellow', 'oo');
+  addShape(920, 300, 60, 40, 'lightgreen', '-ic');
+  addShape(40, 1050, 60, 40, 'lightyellow', 'eigh');
+  addShape(1000, 500, 60, 40, 'lightgreen', '-tion');
+  addShape(775, 500, 60, 40, 'lightgreen', '-sion');
+  addShape(255, 1050, 60, 40, 'lightyellow', 'augh');
+  addShape(325, 1050, 60, 40, 'lightyellow', 'ei');
+  addShape(395, 1050, 60, 40, 'lightyellow', '-ew');
+  addShape(465, 1050, 60, 40, 'lightyellow', '-ey');
+  addShape(535, 1050, 60, 40, 'lightyellow', 'ie');
+  addShape(600, 1050, 60, 40, 'lightyellow', 'ough');
+  addShape(675, 1050, 60, 40, 'lightyellow', '-ue');
+  addShape(750, 1050, 60, 40, 'lightyellow', 'ui');
+  addShape(825, 1050, 60, 40, 'white', 'war');
+  addShape(900, 1050, 60, 40, 'white', 'wor');
+  addShape(40, 1100, 60, 40, 'white', 'gn');
+  addShape(115, 1100, 60, 40, 'white', 'kn-');
+  addShape(185, 1100, 60, 40, 'white', '-mb');
+  addShape(255, 1100, 60, 40, 'white', '-mn');
+  addShape(325, 1100, 60, 40, 'white', 'wr-');
 }
 
 function draw() {
@@ -233,7 +237,7 @@ function draw() {
 
   let inBoxShapes = shapes.filter((s) => s.inBox);
 
-  // Show instruction text only if box is empty
+  // Draw text if empty
   if (inBoxShapes.length === 0) {
     noStroke();
     fill(0);
@@ -242,76 +246,101 @@ function draw() {
     text("🧱 Click letters to build a word", buildArea.x + buildArea.w / 2, buildArea.y + buildArea.h / 2);
   }
 
-  // Animate position and scale smoothly
+  // Smoothly move shapes toward their targets & scale
   for (let s of shapes) {
     s.x = lerp(s.x, s.targetX, 0.15);
     s.y = lerp(s.y, s.targetY, 0.15);
+    s.scale = s.scale === undefined ? 1 : s.scale;
+    s.targetScale = s.targetScale === undefined ? 1 : s.targetScale;
     s.scale = lerp(s.scale, s.targetScale, 0.15);
   }
 
   // Draw shapes
   for (let s of shapes) {
-    push();
-    translate(s.x + s.w / 2, s.y + s.h / 2);
-    scale(s.scale);
     fill(s.color);
     stroke(200);
-    rect(-s.w / 2, -s.h / 2, s.w, s.h, 10);
+    rect(s.x, s.y, s.w * (s.scale || 1), s.h * (s.scale || 1), 10);
     noStroke();
     fill(0);
-    textSize(s.inBox ? 48 : 16); // Large in box, small at bottom
-    text(s.label, 0, 0);
-    pop();
+    textSize(s.inBox ? 48 : 24); // 🔹 larger letters in box
+    text(s.label, s.x + (s.w * (s.scale || 1)) / 2, s.y + (s.h * (s.scale || 1)) / 2);
   }
 
+  // Arrange shapes in box
   arrangeShapesInBox();
 
-  // Show the built word below the box
+  // Show current word
   fill(0);
   textSize(36);
   textStyle(BOLD);
-  textAlign(CENTER, CENTER);
   text("Word: " + getCurrentWord(), buildArea.x + buildArea.w / 2, buildArea.y + buildArea.h + 50);
 }
 
-// Toggle shapes when clicked
+// 🔹 CLICK TO ADD / REMOVE LETTER (cloning)
+// topmost-first check so clones on top are removed by clicking them
 function mousePressed() {
-  for (let s of shapes) {
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    let s = shapes[i];
+    let sw = s.w * (s.scale || 1);
+    let sh = s.h * (s.scale || 1);
     if (
       mouseX > s.x &&
-      mouseX < s.x + s.w &&
+      mouseX < s.x + sw &&
       mouseY > s.y &&
-      mouseY < s.y + s.h
+      mouseY < s.y + sh
     ) {
-      s.inBox = !s.inBox;
-
-      if (s.inBox) {
-        s.color = 'lightyellow';
-        s.targetScale = 1.5;
+      // If it's a base (original) → create a clone (so the original stays)
+      if (s.isBase) {
+        let clone = {
+          x: s.homeX,
+          y: s.homeY,
+          w: s.w,
+          h: s.h,
+          color: 'lightyellow',
+          label: s.label,
+          inBox: true,
+          homeX: s.homeX,
+          homeY: s.homeY,
+          targetX: s.homeX,
+          targetY: s.homeY,
+          originalColor: s.originalColor,
+          scale: 1,            // start at base scale (animates to targetScale)
+          targetScale: 1.5,
+          isBase: false,
+          clickIndex: nextClickIndex++,
+        };
+        shapes.push(clone);
+        arrangeShapesInBox();
+        break;
       } else {
-        s.color = s.originalColor;
-        s.targetScale = 1;
+        // It's a clone (not base) -> remove that clone
+        shapes.splice(i, 1);
+        arrangeShapesInBox();
+        break;
       }
-
-      arrangeShapesInBox();
-      break;
     }
   }
 }
 
-// 🔹 Center and space the letters evenly inside the build box
+// 🔹 Arrange clicked shapes inside build area (preserve click order)
 function arrangeShapesInBox() {
   let inBoxShapes = shapes.filter((s) => s.inBox);
+
   if (inBoxShapes.length === 0) {
-    // Send all letters home if nothing in box
+    // Send base tiles home (and ensure scale = 1)
     for (let s of shapes) {
-      s.targetX = s.homeX;
-      s.targetY = s.homeY;
+      if (s.isBase) {
+        s.targetX = s.homeX;
+        s.targetY = s.homeY;
+        s.targetScale = 1;
+        s.color = s.originalColor;
+      }
     }
     return;
   }
 
-  inBoxShapes.sort((a, b) => a.label.localeCompare(b.label)); // optional: sort alphabetically or by click order
+  // Sort by clickIndex so clones appear in click order
+  inBoxShapes.sort((a, b) => a.clickIndex - b.clickIndex);
 
   const spacing = 20;
   const letterWidth = 90; // width per letter when enlarged
@@ -323,29 +352,44 @@ function arrangeShapesInBox() {
   for (let s of inBoxShapes) {
     s.targetX = currentX;
     s.targetY = centerY - (s.h * 1.5) / 2;
+    s.targetScale = 1.5;
+    s.color = 'lightyellow';
     currentX += letterWidth + spacing;
   }
 
-  // Return all others to home
+  // Return all base tiles to home positions and normal scale/color
   for (let s of shapes) {
-    if (!s.inBox) {
+    if (s.isBase) {
       s.targetX = s.homeX;
       s.targetY = s.homeY;
+      s.targetScale = 1;
+      s.color = s.originalColor;
     }
   }
 }
 
+// 🔹 Build current word (ordered by clickIndex)
 function getCurrentWord() {
   let inBoxShapes = shapes.filter((s) => s.inBox);
+  inBoxShapes.sort((a, b) => a.clickIndex - b.clickIndex);
   return inBoxShapes.map((s) => s.label).join('');
 }
 
+// 🔹 Reset everything (removes clones and returns bases)
 function resetShapes() {
+  // keep only base shapes
+  shapes = shapes.filter((s) => s.isBase);
+  // reset base tile positions and colors
   for (let s of shapes) {
-    s.inBox = false;
-    s.color = s.originalColor;
+    s.x = s.homeX;
+    s.y = s.homeY;
     s.targetX = s.homeX;
     s.targetY = s.homeY;
+    s.scale = 1;
     s.targetScale = 1;
+    s.color = s.originalColor;
+    s.inBox = false;
+    s.clickIndex = null;
   }
+  nextClickIndex = 0;
 }
