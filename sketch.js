@@ -1,48 +1,123 @@
+// Responsive, centered, proportional version of your program
+// BASE design size (what your original coords were designed for)
+const BASE_W = 1600;
+const BASE_H = 1400;
+
 let shapes = [];
-let buildArea = { x: 50, y: 50, w: 800, h: 100 };
+let buildAreaBase = { x: 50, y: 50, w: 800, h: 100 }; // base coords (unchanged)
 let resetButton;
 let nextClickIndex = 0; // for ordering clones
 
+// runtime layout
+let scaleFactor = 1;
+let offsetX = 0;
+let offsetY = 0;
+
 function setup() {
-  createCanvas(1600, 1400);
+  createCanvas(windowWidth, windowHeight);
   textAlign(CENTER, CENTER);
-  textSize(20);
   rectMode(CORNER);
   noStroke();
 
-  // Reset button
+  // Create reset button (we'll position it in repositionLayout)
   resetButton = createButton("🔄 Reset");
-  resetButton.position(900, 275);
-  resetButton.style('font-size', '24px');
+  resetButton.style('font-size', '20px'); // base style; will be visually scaled by position and textSize usage
   resetButton.mousePressed(resetShapes);
 
-  // Load shapes
+  // Load base shapes (use base coordinates here)
   addShapes();
+
+  // Compute initial layout and update display coordinates
+  repositionLayout();
 }
 
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  repositionLayout();
+}
+
+// ----- Helpers for scaling/centering -----
+function computeLayout() {
+  // keep proportions: choose the smaller scale so everything fits
+  const sx = windowWidth / BASE_W;
+  const sy = windowHeight / BASE_H;
+  scaleFactor = min(sx, sy);
+
+  // center the scaled design
+  offsetX = (windowWidth - BASE_W * scaleFactor) / 2;
+  offsetY = (windowHeight - BASE_H * scaleFactor) / 2;
+}
+
+// convert base coordinate -> displayed coordinate
+function sx(v) { return offsetX + v * scaleFactor; }
+function sy(v) { return offsetY + v * scaleFactor; }
+// convert base length -> displayed length
+function sw(v) { return v * scaleFactor; }
+function sh(v) { return v * scaleFactor; }
+
+// Recompute display positions for UI elements and shapes when the window size changes
+function repositionLayout() {
+  computeLayout();
+
+  // position the reset button under the build area (centered)
+  const buildX = sx(buildAreaBase.x);
+  const buildY = sy(buildAreaBase.y);
+  const buildW = sw(buildAreaBase.w);
+  const buildH = sh(buildAreaBase.h);
+
+  // style the button font size based on scale (a little clamp so it stays readable)
+  const btnSize = Math.max(14, Math.round(18 * scaleFactor));
+  resetButton.style('font-size', btnSize + 'px');
+
+  // place button centered beneath the build area (adjust vertical offset a bit)
+  const btnX = buildX + buildW / 2 - (80 * scaleFactor); // approximate half button width
+  const btnY = buildY + buildH + 40 * scaleFactor;
+  resetButton.position(btnX, btnY);
+
+  // update every shape's displayed positions based on base coords
+  for (let s of shapes) {
+    // for base tiles: keep their logical home (base) coords, compute displayed x/y from them
+    s.displayX = sx(s.homeX);
+    s.displayY = sy(s.homeY);
+    s.displayW = sw(s.w);
+    s.displayH = sh(s.h);
+
+    // initialize target display positions if not present
+    s.targetDisplayX = s.targetDisplayX === undefined ? s.displayX : sx(s.baseTargetX || s.homeX);
+    s.targetDisplayY = s.targetDisplayY === undefined ? s.displayY : sy(s.baseTargetY || s.homeY);
+
+    // local scale (1 for base visual size; clones will target 1.5)
+    s.displayLocalScale = s.displayLocalScale === undefined ? 1 : s.displayLocalScale;
+    s.targetLocalScale = s.targetLocalScale === undefined ? 1 : s.targetLocalScale;
+  }
+
+  // Make sure clones that are in box get arranged with recalculated display coords
+  arrangeShapesInBox();
+}
+
+// ----- Shape creation (store base coords) -----
 function addShapes() {
   function addShape(x, y, w, h, color, label) {
     shapes.push({
-      x,
-      y,
-      w,
-      h,
-      color,
-      label,
-      inBox: false,         // only clones will be true
-      homeX: x,
-      homeY: y,
-      targetX: x,
-      targetY: y,
-      scale: 1,
-      targetScale: 1,
+      homeX: x, homeY: y, // base home coords
+      w: w, h: h,         // base sizes
+      color: color,
+      label: label,
+      inBox: false,       // only clones will be true
+      baseTargetX: x,
+      baseTargetY: y,
+      displayX: 0, displayY: 0, // will be set in repositionLayout()
+      targetDisplayX: 0, targetDisplayY: 0,
+      displayW: 0, displayH: 0,
+      displayLocalScale: 1,
+      targetLocalScale: 1,
       originalColor: color,
-      isBase: true,         // originals are base tiles (never removed)
-      clickIndex: null      // used for clones only
+      isBase: true,       // originals are base tiles (never removed)
+      clickIndex: null
     });
   }
 
-  // Example subset — reinsert your full set here (kept identical)
+  // Example subset — kept identical to user's original base coordinates
   addShape(40, 300, 40, 40, 'lightyellow', 'a');
   addShape(90, 300, 40, 40, 'white', 'b');
   addShape(140, 300, 40, 40, 'white', 'c');
@@ -227,85 +302,110 @@ function addShapes() {
   addShape(325, 1100, 60, 40, 'white', 'wr-');
 }
 
+// ----- draw loop -----
 function draw() {
   background(240);
 
-  // Draw white build area
+  // Draw build area (display coords)
+  const bX = sx(buildAreaBase.x);
+  const bY = sy(buildAreaBase.y);
+  const bW = sw(buildAreaBase.w);
+  const bH = sh(buildAreaBase.h);
+
   stroke(180);
   fill(255);
-  rect(buildArea.x, buildArea.y, buildArea.w, buildArea.h, 15);
+  rect(bX, bY, bW, bH, 15 * scaleFactor);
 
+  // Which shapes are in the box (clones)
   let inBoxShapes = shapes.filter((s) => s.inBox);
 
-  // Draw text if empty
+  // Draw hint text when empty
   if (inBoxShapes.length === 0) {
     noStroke();
     fill(0);
-    textSize(24);
+    textSize(24 * scaleFactor);
     textAlign(CENTER, CENTER);
-    text("🧱 Click letters to build a word", buildArea.x + buildArea.w / 2, buildArea.y + buildArea.h / 2);
+    text("🧱 Click letters to build a word", bX + bW / 2, bY + bH / 2);
   }
 
   // Smoothly move shapes toward their targets & scale
   for (let s of shapes) {
-    s.x = lerp(s.x, s.targetX, 0.15);
-    s.y = lerp(s.y, s.targetY, 0.15);
-    s.scale = s.scale === undefined ? 1 : s.scale;
-    s.targetScale = s.targetScale === undefined ? 1 : s.targetScale;
-    s.scale = lerp(s.scale, s.targetScale, 0.15);
+    // initialize if undefined
+    s.displayX = s.displayX === undefined ? sx(s.homeX) : s.displayX;
+    s.displayY = s.displayY === undefined ? sy(s.homeY) : s.displayY;
+    s.displayLocalScale = s.displayLocalScale === undefined ? 1 : s.displayLocalScale;
+    s.targetLocalScale = s.targetLocalScale === undefined ? 1 : s.targetLocalScale;
+    s.targetDisplayX = s.targetDisplayX === undefined ? sx(s.homeX) : s.targetDisplayX;
+    s.targetDisplayY = s.targetDisplayY === undefined ? sy(s.homeY) : s.targetDisplayY;
+
+    // lerp for smooth motion
+    s.displayX = lerp(s.displayX, s.targetDisplayX, 0.15);
+    s.displayY = lerp(s.displayY, s.targetDisplayY, 0.15);
+    s.displayLocalScale = lerp(s.displayLocalScale, s.targetLocalScale, 0.15);
+
+    // refresh displayed width/height based on base sizes
+    s.displayW = sw(s.w) * s.displayLocalScale;
+    s.displayH = sh(s.h) * s.displayLocalScale;
   }
 
-  // Draw shapes
+  // Draw shapes (base tiles + clones)
   for (let s of shapes) {
     fill(s.color);
     stroke(200);
-    rect(s.x, s.y, s.w * (s.scale || 1), s.h * (s.scale || 1), 10);
+    rect(s.displayX, s.displayY, s.displayW, s.displayH, 10 * scaleFactor);
     noStroke();
     fill(0);
-    textSize(s.inBox ? 48 : 24); // 🔹 larger letters in box
-    text(s.label, s.x + (s.w * (s.scale || 1)) / 2, s.y + (s.h * (s.scale || 1)) / 2);
+
+    // text size: bigger when inBox
+    const textBase = s.inBox ? 48 : 24;
+    textSize(textBase * scaleFactor);
+    text(s.label, s.displayX + s.displayW / 2, s.displayY + s.displayH / 2);
   }
 
-  // Arrange shapes in box
+  // Arrange shapes in box (positions are targets — this ensures items animate to their places)
   arrangeShapesInBox();
 
-  // Show current word
+  // Show current word under the build area
   fill(0);
-  textSize(36);
+  textSize(36 * scaleFactor);
   textStyle(BOLD);
-  text("Word: " + getCurrentWord(), buildArea.x + buildArea.w / 2, buildArea.y + buildArea.h + 50);
+  text("Word: " + getCurrentWord(), bX + bW / 2, bY + bH + 50 * scaleFactor);
+  textStyle(NORMAL);
 }
 
-// 🔹 CLICK TO ADD / REMOVE LETTER (cloning)
-// topmost-first check so clones on top are removed by clicking them
+// ----- Mouse handling: topmost-first so clones on top can be removed easily -----
 function mousePressed() {
+  // Use displayed coords for hit testing. loop from top to bottom to pick topmost
   for (let i = shapes.length - 1; i >= 0; i--) {
     let s = shapes[i];
-    let sw = s.w * (s.scale || 1);
-    let sh = s.h * (s.scale || 1);
+    // compute current bounding box
+    let swd = s.displayW;
+    let shd = s.displayH;
     if (
-      mouseX > s.x &&
-      mouseX < s.x + sw &&
-      mouseY > s.y &&
-      mouseY < s.y + sh
+      mouseX > s.displayX &&
+      mouseX < s.displayX + swd &&
+      mouseY > s.displayY &&
+      mouseY < s.displayY + shd
     ) {
-      // If it's a base (original) → create a clone (so the original stays)
+      // If it's a base tile -> create clone
       if (s.isBase) {
         let clone = {
-          x: s.homeX,
-          y: s.homeY,
-          w: s.w,
-          h: s.h,
+          homeX: s.homeX, homeY: s.homeY, // base coords
+          w: s.w, h: s.h,
           color: 'lightyellow',
           label: s.label,
           inBox: true,
-          homeX: s.homeX,
-          homeY: s.homeY,
-          targetX: s.homeX,
-          targetY: s.homeY,
+          baseTargetX: s.homeX,
+          baseTargetY: s.homeY,
+          displayX: sx(s.homeX),
+          displayY: sy(s.homeY),
+          targetDisplayX: sx(s.homeX),
+          targetDisplayY: sy(s.homeY),
+          displayW: sw(s.w),
+          displayH: sh(s.h),
+          displayLocalScale: 1,
+          targetLocalScale: 1.5, // bigger in box
           originalColor: s.originalColor,
-          scale: 1,            // start at base scale (animates to targetScale)
-          targetScale: 1.5,
           isBase: false,
           clickIndex: nextClickIndex++,
         };
@@ -313,7 +413,7 @@ function mousePressed() {
         arrangeShapesInBox();
         break;
       } else {
-        // It's a clone (not base) -> remove that clone
+        // It's a clone -> remove it
         shapes.splice(i, 1);
         arrangeShapesInBox();
         break;
@@ -322,17 +422,17 @@ function mousePressed() {
   }
 }
 
-// 🔹 Arrange clicked shapes inside build area (preserve click order)
+// ----- Arrange clicked shapes inside build area (preserve click order) -----
 function arrangeShapesInBox() {
   let inBoxShapes = shapes.filter((s) => s.inBox);
 
   if (inBoxShapes.length === 0) {
-    // Send base tiles home (and ensure scale = 1)
+    // No clones: send base tiles home
     for (let s of shapes) {
       if (s.isBase) {
-        s.targetX = s.homeX;
-        s.targetY = s.homeY;
-        s.targetScale = 1;
+        s.targetDisplayX = sx(s.homeX);
+        s.targetDisplayY = sy(s.homeY);
+        s.targetLocalScale = 1;
         s.color = s.originalColor;
       }
     }
@@ -342,54 +442,58 @@ function arrangeShapesInBox() {
   // Sort by clickIndex so clones appear in click order
   inBoxShapes.sort((a, b) => a.clickIndex - b.clickIndex);
 
-  const spacing = 20;
-  const letterWidth = 90; // width per letter when enlarged
-  const totalWidth = inBoxShapes.length * letterWidth + (inBoxShapes.length - 1) * spacing;
-  const startX = buildArea.x + (buildArea.w - totalWidth) / 2;
-  const centerY = buildArea.y + buildArea.h / 2;
+  const spacingBase = 20;           // base spacing in your design units
+  const letterWidthBase = 90;      // base width per letter when enlarged (matching your original)
+  const totalWidthBase = inBoxShapes.length * letterWidthBase + (inBoxShapes.length - 1) * spacingBase;
+  const startXBase = buildAreaBase.x + (buildAreaBase.w - totalWidthBase) / 2;
+  const centerYBase = buildAreaBase.y + buildAreaBase.h / 2;
 
-  let currentX = startX;
+  // place each clone (set targets in displayed coordinates so lerp animation works)
+  let currentXBase = startXBase;
   for (let s of inBoxShapes) {
-    s.targetX = currentX;
-    s.targetY = centerY - (s.h * 1.5) / 2;
-    s.targetScale = 1.5;
+    // target positions (display coords)
+    s.targetDisplayX = sx(currentXBase);
+    s.targetDisplayY = sy(centerYBase - (s.h * 1.5) / 2); // vertical center adjusted for scaled height
+    s.targetLocalScale = 1.5; // clones enlarge by 1.5x (local multiplier)
     s.color = 'lightyellow';
-    currentX += letterWidth + spacing;
+    currentXBase += letterWidthBase + spacingBase;
   }
 
   // Return all base tiles to home positions and normal scale/color
   for (let s of shapes) {
     if (s.isBase) {
-      s.targetX = s.homeX;
-      s.targetY = s.homeY;
-      s.targetScale = 1;
+      s.targetDisplayX = sx(s.homeX);
+      s.targetDisplayY = sy(s.homeY);
+      s.targetLocalScale = 1;
       s.color = s.originalColor;
     }
   }
 }
 
-// 🔹 Build current word (ordered by clickIndex)
+// ----- Get current word (ordered by clickIndex) -----
 function getCurrentWord() {
   let inBoxShapes = shapes.filter((s) => s.inBox);
   inBoxShapes.sort((a, b) => a.clickIndex - b.clickIndex);
   return inBoxShapes.map((s) => s.label).join('');
 }
 
-// 🔹 Reset everything (removes clones and returns bases)
+// ----- Reset everything (remove clones, return bases) -----
 function resetShapes() {
   // keep only base shapes
   shapes = shapes.filter((s) => s.isBase);
+
   // reset base tile positions and colors
   for (let s of shapes) {
-    s.x = s.homeX;
-    s.y = s.homeY;
-    s.targetX = s.homeX;
-    s.targetY = s.homeY;
-    s.scale = 1;
-    s.targetScale = 1;
+    s.displayX = sx(s.homeX);
+    s.displayY = sy(s.homeY);
+    s.targetDisplayX = sx(s.homeX);
+    s.targetDisplayY = sy(s.homeY);
+    s.displayLocalScale = 1;
+    s.targetLocalScale = 1;
     s.color = s.originalColor;
     s.inBox = false;
     s.clickIndex = null;
   }
   nextClickIndex = 0;
+  arrangeShapesInBox();
 }
