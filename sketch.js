@@ -331,8 +331,7 @@ function layoutGroups() {
   const blockGap = max(40 * scaleFactor, 24);
   const rowGap = max(30 * scaleFactor, 18);
 
-  let y = buildArea.y + buildArea.h + 30 * scaleFactor;
-  y = max(y, SAFE_MARGIN);
+  let y = buildArea.y + buildArea.h + 120; 
   let currentRowWidth = 0;
 
   // We'll build a new list of baseShapes positions based on groups (wrapping blocks)
