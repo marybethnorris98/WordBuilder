@@ -19,18 +19,13 @@ const DESIGN_H = 1400;
 const CATEGORY_COUNT = 18;
 const SAFE_MARGIN = 50;   // about 1/2 inch on most screens
 
-// small UI feedback
-let lastMessage = "";
-let lastMessageTime = 0;    // timestamp (ms)
-const MESSAGE_DURATION = 6000; // ms
-
 // NOTE: disabled font loading for GitHub Pages (CORS-safe)
 function preload() {
   // intentionally left blank (avoid loadFont from remote CDN)
 }
 
 function setup() {
-  // full-window canvas (avoid negative/incorrect sizes on some hosts)
+  // full-window canvas
   createCanvas(windowWidth, windowHeight);
 
   // drawing defaults
@@ -81,8 +76,9 @@ function windowResized() {
   calculateScale();
 
   // rebuild buildArea using new width/height (respect SAFE_MARGIN)
-  buildArea.w = width - SAFE_MARGIN * 2;
+  buildArea.x = SAFE_MARGIN;
   buildArea.y = SAFE_MARGIN;
+  buildArea.w = width - SAFE_MARGIN * 2;
   buildArea.h = constrain(120 * scaleFactor, 80, 200);
 
   categorizeBaseShapes();
@@ -98,20 +94,19 @@ function styleAppButton(btn) {
   btn.style("border-radius", "10px");
   btn.style("background", "white");
   btn.style("box-shadow", "0 6px 12px rgba(0,0,0,0.06)");
-  // ensure pointer cursor
   btn.style("cursor", "pointer");
 }
 
 // position three buttons centered under the build area
 function positionButtons() {
-  // buildArea coordinates are in screen pixels (we draw rect at these coords)
+  // buildArea coordinates are in canvas pixels
   const areaX = buildArea.x;
   const areaY = buildArea.y;
   const areaW = buildArea.w;
   const areaH = buildArea.h;
 
-  // get actual DOM widths (safely)
-  const wReset  = resetButton && resetButton.elt ? resetButton.elt.offsetWidth : 100;
+  // get actual DOM widths (fallback values if not yet measured)
+  const wReset  = resetButton && resetButton.elt ? resetButton.elt.offsetWidth : 90;
   const wCheck  = checkButton && checkButton.elt ? checkButton.elt.offsetWidth : 120;
   const wDefine = defineButton && defineButton.elt ? defineButton.elt.offsetWidth : 120;
 
@@ -121,7 +116,7 @@ function positionButtons() {
   const startX = areaX + (areaW - totalW) / 2;
   const y = areaY + areaH + 18;   // 18 px below the white box
 
-  // position (p5 dom positions are page coordinates; canvas at 0,0 so these align)
+  // position (p5 DOM positions are page coordinates; canvas at top-left so these align)
   resetButton.position(startX, y);
   checkButton.position(startX + wReset + gap, y);
   defineButton.position(startX + wReset + wCheck + gap * 2, y);
@@ -408,20 +403,6 @@ function draw() {
   }
 
   arrangeShapesInBox();
-
-  // small feedback UI under buttons
-  if (lastMessage && millis() - lastMessageTime < MESSAGE_DURATION) {
-    const msgX = buildArea.x + buildArea.w / 2;
-    const msgY = buildArea.y + buildArea.h + 80;
-    push();
-    noStroke();
-    fill("rgba(255,255,255,0.95)");
-    rect(msgX - 260/2, msgY - 28, 260, 56, 10);
-    fill("#222");
-    textSize(14);
-    text(lastMessage, msgX, msgY);
-    pop();
-  }
 }
 
 // -----------------------------
@@ -549,35 +530,30 @@ function resetShapes() {
     s.targetY = s.homeY;
   }
   positionButtons();
-  lastMessage = "Cleared.";
-  lastMessageTime = millis();
+  // quick confirmation
+  alert("Cleared.");
 }
 
 // -----------------------------
-// DICTIONARY: Check word and show definition (Free Dictionary API)
+// DICTIONARY: Check word and show definition (Free Dictionary API) — Option A: alerts
 // -----------------------------
 async function checkWord() {
   const word = getCurrentWord().toLowerCase();
 
   if (!word) {
-    lastMessage = "No word to check.";
-    lastMessageTime = millis();
+    alert("No word built.");
     return;
   }
 
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
     if (!res.ok) {
-      lastMessage = `❌ "${word}" is not found.`;
-      lastMessageTime = millis();
+      alert(`❌ "${word}" is NOT a recognized English word (by the API).`);
       return;
     }
-    // word exists
-    lastMessage = `✔️ "${word}" is a real English word.`;
-    lastMessageTime = millis();
+    alert(`✔️ "${word}" appears to be a real English word.`);
   } catch (err) {
-    lastMessage = "Network error while checking word.";
-    lastMessageTime = millis();
+    alert("Network error while checking word. Check your connection.");
   }
 }
 
@@ -585,45 +561,39 @@ async function showDefinition() {
   const word = getCurrentWord().toLowerCase();
 
   if (!word) {
-    lastMessage = "No word to define.";
-    lastMessageTime = millis();
+    alert("No word built.");
     return;
   }
 
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
     if (!res.ok) {
-      lastMessage = `❌ Definition not found for "${word}".`;
-      lastMessageTime = millis();
+      alert(`❌ No definition found for "${word}".`);
       return;
     }
 
     const json = await res.json();
-    // try to pull first available definition
     if (!Array.isArray(json) || json.length === 0) {
-      lastMessage = `❌ No definition available for "${word}".`;
-      lastMessageTime = millis();
+      alert(`❌ No definition available for "${word}".`);
       return;
     }
 
-    const firstEntry = json[0];
-    const meaning = firstEntry.meanings && firstEntry.meanings[0];
+    // extract first useful definition
+    const entry = json[0];
+    const meaning = entry.meanings && entry.meanings[0];
     const defObj = meaning && meaning.definitions && meaning.definitions[0];
     const part = meaning && meaning.partOfSpeech ? ` (${meaning.partOfSpeech})` : "";
-    const defText = defObj && defObj.definition ? defObj.definition : null;
-    const example = defObj && defObj.example ? `\n\n“${defObj.example}”` : "";
+    const definition = defObj && defObj.definition ? defObj.definition : null;
+    const example = defObj && defObj.example ? `\n\nExample: "${defObj.example}"` : "";
 
-    if (!defText) {
-      lastMessage = `❌ No definition available for "${word}".`;
-      lastMessageTime = millis();
+    if (!definition) {
+      alert(`❌ No definition available for "${word}".`);
       return;
     }
 
-    // show formatted short definition in the feedback area
-    lastMessage = `📘 ${word}${part}: ${defText}${example}`;
-    lastMessageTime = millis();
+    // show via alert (Option A)
+    alert(`📘 ${word}${part} — ${definition}${example}`);
   } catch (err) {
-    lastMessage = "Network error while fetching definition.";
-    lastMessageTime = millis();
+    alert("Network error while fetching definition. Check your connection.");
   }
 }
