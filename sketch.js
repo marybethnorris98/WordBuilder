@@ -1,4 +1,3 @@
-// sketch.js — fixed full version for GitHub Pages
 let baseShapes = [];   // master unique tiles (objects)
 let shapes = [];       // runtime array (base tiles first, clones appended)
 let groups = [];       // CATEGORY_COUNT groups arrays of baseShapes references
@@ -26,6 +25,7 @@ function preload() {
 }
 
 function setup() {
+  console.log("setup() start");
   // full-window canvas
   createCanvas(windowWidth, windowHeight);
 
@@ -38,6 +38,8 @@ function setup() {
   createBaseShapesFromFullList();
   categorizeBaseShapes();
   calculateScale();
+
+  console.log("baseShapes:", baseShapes.length);
 
   // initial buildArea (positioned inside canvas using SAFE_MARGIN)
   buildArea = {
@@ -68,8 +70,8 @@ function setup() {
   shapes = baseShapes.map(b => ({ ...b }));
 
   // position now and shortly after to allow the DOM to report widths
-  positionButtons();
-  setTimeout(positionButtons, 80);
+  schedulePositionButtons();
+  console.log("setup() end");
 }
 
 function windowResized() {
@@ -87,10 +89,11 @@ function windowResized() {
   categorizeBaseShapes();
   layoutGroups();
   shapes = baseShapes.map(b => ({ ...b }));
-  positionButtons();
+  schedulePositionButtons();
 }
 
 function styleAppButton(btn) {
+  if (!btn) return;
   btn.style("font-family", "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial");
   btn.style("font-size", "16px");
   btn.style("padding", "8px 12px");
@@ -99,13 +102,24 @@ function styleAppButton(btn) {
   btn.style("box-shadow", "0 6px 12px rgba(0,0,0,0.06)");
   btn.style("cursor", "pointer");
   btn.style("border", "none");
-  // ensure pointer events
-  if (btn.elt) btn.elt.style.pointerEvents = "auto";
+  // ensure pointer events if element available
+  try { if (btn.elt) btn.elt.style.pointerEvents = "auto"; } catch(e) {}
+}
+
+// safe scheduling helper — ensures DOM has measured button sizes
+function schedulePositionButtons() {
+  // try via requestAnimationFrame, then fallback setTimeouts
+  requestAnimationFrame(() => {
+    positionButtons();
+    setTimeout(positionButtons, 60);
+    setTimeout(positionButtons, 250);
+  });
 }
 
 // position three buttons centered under the build area
 function positionButtons() {
   if (!buildArea) return;
+  if (!resetButton || !checkButton || !defineButton) return;
 
   // buildArea coordinates are in canvas pixels
   const areaX = buildArea.x;
@@ -114,9 +128,9 @@ function positionButtons() {
   const areaH = buildArea.h;
 
   // get actual DOM widths (fallback values if not yet measured)
-  const wReset  = resetButton && resetButton.elt ? resetButton.elt.offsetWidth || 90 : 90;
-  const wCheck  = checkButton && checkButton.elt ? checkButton.elt.offsetWidth || 120 : 120;
-  const wDefine = defineButton && defineButton.elt ? defineButton.elt.offsetWidth || 120 : 120;
+  const wReset  = safeEltWidth(resetButton, 90);
+  const wCheck  = safeEltWidth(checkButton, 120);
+  const wDefine = safeEltWidth(defineButton, 120);
 
   const gap = 18; // px gap between buttons
   const totalW = wReset + wCheck + wDefine + gap * 2;
@@ -126,11 +140,22 @@ function positionButtons() {
   const y = areaY + areaH + 18;   // 18 px below the white box
 
   // position (p5 DOM positions are page coordinates; canvas at top-left so these align)
-  resetButton.position(startX, y);
-  checkButton.position(startX + wReset + gap, y);
-  defineButton.position(startX + wReset + wCheck + gap * 2, y);
+  try {
+    resetButton.position(startX, y);
+    checkButton.position(startX + wReset + gap, y);
+    defineButton.position(startX + wReset + wCheck + gap * 2, y);
+  } catch (err) {
+    // if p5 DOM isn't ready yet do nothing — schedule will re-run
+    // console.debug("positionButtons error:", err);
+  }
 }
 
+function safeEltWidth(p5Button, fallback) {
+  try {
+    if (p5Button && p5Button.elt && p5Button.elt.offsetWidth) return p5Button.elt.offsetWidth;
+  } catch(e){}
+  return fallback;
+}
 
 // scale calculation
 function calculateScale() {
@@ -353,7 +378,7 @@ function layoutGroups() {
 
   // After placing all blocks, update runtime shapes as copies of baseShapes
   shapes = baseShapes.map(b => ({ ...b }));
-  positionButtons();
+  schedulePositionButtons();
 }
 
 // -----------------------------
@@ -386,7 +411,6 @@ function draw() {
 
   // draw tiles (bases and clones)
   for (let s of shapes) {
-
     // draw subtle shadow (under tile)
     push();
     noStroke();
@@ -403,11 +427,7 @@ function draw() {
     // tile text (dark gray)
     noStroke();
     fill("#282828");
-    textSize(
-      s.inBox
-        ? s.h * s.scale * 0.82
-        : s.h * s.scale * 0.58
-    );
+    textSize(s.inBox ? s.h * s.scale * 0.82 : s.h * s.scale * 0.58);
     text(s.label, s.x + (s.w * s.scale) / 2, s.y + (s.h * s.scale) / 2);
     pop();
   }
@@ -419,14 +439,12 @@ function draw() {
 // Mouse press: click base or clone
 // -----------------------------
 function mousePressed() {
-  // iterate top-down so later shapes (clones) can be removed if clicked
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i];
     const sw = s.w * s.scale;
     const sh = s.h * s.scale;
     if (mouseX > s.x && mouseX < s.x + sw && mouseY > s.y && mouseY < s.y + sh) {
       if (s.isBase) {
-        // create a clone (keep original category color)
         const clone = {
           label: s.label,
           w: s.w, h: s.h,
@@ -446,7 +464,6 @@ function mousePressed() {
         arrangeShapesInBox();
         return;
       } else {
-        // clicked a clone -> remove it
         shapes.splice(i, 1);
         arrangeShapesInBox();
         return;
@@ -459,12 +476,9 @@ function mousePressed() {
 // Arrange shapes that are in the top box
 // -----------------------------
 function arrangeShapesInBox() {
-  const inBox = shapes
-    .filter(s => s.inBox)
-    .sort((a, b) => (a.clickIndex || 0) - (b.clickIndex || 0));
+  const inBox = shapes.filter(s => s.inBox).sort((a,b) => (a.clickIndex||0)-(b.clickIndex||0));
 
   if (inBox.length === 0) {
-    // return bases back to their home positions
     for (let s of shapes) {
       if (s.isBase) {
         s.targetX = s.homeX;
@@ -476,34 +490,23 @@ function arrangeShapesInBox() {
     return;
   }
 
-  // spacing logic for box
   const spacing = max(8 * scaleFactor, 8);
-  // compute available width per tile with padding
   const maxLetterW = min(160 * scaleFactor, buildArea.w / inBox.length * 0.9);
   const letterW = max(40 * scaleFactor, maxLetterW);
   const totalW = inBox.length * letterW + (inBox.length - 1) * spacing;
-
   let startX = buildArea.x + (buildArea.w - totalW) / 2;
   const centerY = buildArea.y + buildArea.h / 2;
-
   let x = startX;
+
   for (let t of inBox) {
     t.targetX = x;
     t.targetY = centerY - (t.h * t.targetScale) / 2;
-
     const base = baseShapes.find(b => b.label === t.label);
-    if (base) {
-      t.color = base.originalColor;
-    } else {
-      t.color = '#ffffff';
-    }
-    // scale to fit box height (but keep within a cap)
+    t.color = base ? base.originalColor : "#ffffff";
     t.targetScale = min(2.0, (buildArea.h / t.h) * 0.9);
-
     x += letterW + spacing;
   }
 
-  // ensure all base tiles remain at home positions visually
   for (let s of shapes) {
     if (s.isBase) {
       s.targetX = s.homeX;
@@ -515,11 +518,7 @@ function arrangeShapesInBox() {
 }
 
 function getCurrentWord() {
-  return shapes
-    .filter(s => s.inBox)
-    .sort((a, b) => (a.clickIndex || 0) - (b.clickIndex || 0))
-    .map(s => s.label)
-    .join("");
+  return shapes.filter(s => s.inBox).sort((a,b)=>(a.clickIndex||0)-(b.clickIndex||0)).map(s=>s.label).join("");
 }
 
 // -----------------------------
@@ -539,9 +538,9 @@ function resetShapes() {
     s.targetX = s.homeX;
     s.targetY = s.homeY;
   }
-  positionButtons();
-  // quick confirmation
-  alert("Cleared.");
+  schedulePositionButtons();
+  // quick confirmation (use console for less intrusive feedback)
+  console.log("resetShapes(): cleared.");
 }
 
 // -----------------------------
@@ -549,18 +548,11 @@ function resetShapes() {
 // -----------------------------
 async function checkWord() {
   const word = getCurrentWord().toLowerCase();
-
-  if (!word) {
-    alert("No word built.");
-    return;
-  }
+  if (!word) { alert("No word built."); return; }
 
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-    if (!res.ok) {
-      alert(`❌ "${word}" is NOT a recognized English word (by the API).`);
-      return;
-    }
+    if (!res.ok) { alert(`❌ "${word}" is NOT a recognized English word (by the API).`); return; }
     alert(`✔️ "${word}" appears to be a real English word.`);
   } catch (err) {
     alert("Network error while checking word. Check your connection.");
@@ -569,26 +561,14 @@ async function checkWord() {
 
 async function showDefinition() {
   const word = getCurrentWord().toLowerCase();
-
-  if (!word) {
-    alert("No word built.");
-    return;
-  }
+  if (!word) { alert("No word built."); return; }
 
   try {
     const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-    if (!res.ok) {
-      alert(`❌ No definition found for "${word}".`);
-      return;
-    }
-
+    if (!res.ok) { alert(`❌ No definition found for "${word}".`); return; }
     const json = await res.json();
-    if (!Array.isArray(json) || json.length === 0) {
-      alert(`❌ No definition available for "${word}".`);
-      return;
-    }
+    if (!Array.isArray(json) || json.length === 0) { alert(`❌ No definition available for "${word}".`); return; }
 
-    // extract first useful definition
     const entry = json[0];
     const meaning = entry.meanings && entry.meanings[0];
     const defObj = meaning && meaning.definitions && meaning.definitions[0];
@@ -596,12 +576,7 @@ async function showDefinition() {
     const definition = defObj && defObj.definition ? defObj.definition : null;
     const example = defObj && defObj.example ? `\n\nExample: "${defObj.example}"` : "";
 
-    if (!definition) {
-      alert(`❌ No definition available for "${word}".`);
-      return;
-    }
-
-    // show via alert
+    if (!definition) { alert(`❌ No definition available for "${word}".`); return; }
     alert(`📘 ${word}${part} — ${definition}${example}`);
   } catch (err) {
     alert("Network error while fetching definition. Check your connection.");
