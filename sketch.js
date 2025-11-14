@@ -8,7 +8,7 @@ let scaleFactor = 1;
 let mainFont;
 const backgroundColor = ("#FAF8F0");    // warm off-white
 const buildAreaColor = ("#FFFFFF"); // slightly translucent white
-const tileShadowColor = ("#0000001f");      // subtle shadow
+const tileShadowColor = "rgba(0, 0, 0, 0.12)";      // subtle shadow
 const tileCorner = 12;                       // rounded corner radius
 const tileShadowOffset = 4;                  // px shadow offset for tiles
 
