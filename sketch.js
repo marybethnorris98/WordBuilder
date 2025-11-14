@@ -78,8 +78,6 @@ function windowResized() {
   categorizeBaseShapes();
   layoutGroups();
   shapes = baseShapes.map(b => ({ ...b }));
-  positionResetButton();
-}
 
 function positionResetButton() {
   const btnX = buildArea.x + SAFE_MARGIN;
