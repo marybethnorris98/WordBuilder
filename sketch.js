@@ -1,5 +1,3 @@
-11/13/25 2:42
-
 let shapes = [];
 let buildArea = { x: 50, y: 50, w: 800, h: 100 };
 let resetButton;
