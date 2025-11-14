@@ -6,9 +6,9 @@ let resetButton;
 let buildArea;
 let scaleFactor = 1;
 let mainFont;
-const backgroundColor = [250, 248, 240];    // warm off-white
-const buildAreaColor = [255, 255, 255, 230]; // slightly translucent white
-const tileShadowColor = [0, 0, 0, 22];      // subtle shadow
+const backgroundColor = (250, 248, 240);    // warm off-white
+const buildAreaColor = (255, 255, 255, 230); // slightly translucent white
+const tileShadowColor = (0, 0, 0, 22);      // subtle shadow
 const tileCorner = 12;                       // rounded corner radius
 const tileShadowOffset = 4;                  // px shadow offset for tiles
 
