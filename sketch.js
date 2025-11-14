@@ -54,6 +54,7 @@ function setup() {
   defineButton.mousePressed(showDefinition);
 
   layoutGroups();
+  setBaseHomes();                 // ← CHANGED: capture home positions after layout
   shapes = baseShapes.map(b => ({ ...b }));
 
   schedulePositionButtons();
@@ -70,6 +71,7 @@ function windowResized() {
 
   categorizeBaseShapes();
   layoutGroups();
+  setBaseHomes();                 // ← CHANGED: recalc homes on resize
   shapes = baseShapes.map(b => ({ ...b }));
   schedulePositionButtons();
 }
@@ -270,13 +272,13 @@ function layoutGroups() {
   const startY = buildArea.y + buildArea.h + 80;   // gap below build area
   const rowGap = 30;     // gap between wrapped rows
   const colGap = 20;     // gap between shapes in same row
-  const maxW = DESIGN_W - 40; // right boundary for wrapping
+  const maxW = width - SAFE_MARGIN; // ← CHANGED: use actual canvas width boundary
 
   let y = startY;
 
   for (let g = 0; g < groups.length; g++) {
 
-    let x = 40; // left margin for each row
+    let x = SAFE_MARGIN; // ← CHANGED: start at safe margin
 
     for (let s of groups[g]) {
       const w = s.w;
@@ -284,7 +286,7 @@ function layoutGroups() {
 
       // If tile would spill past the right side → wrap to new line
       if (x + w > maxW) {
-        x = 40;
+        x = SAFE_MARGIN;
         y += h + rowGap;
       }
 
@@ -300,6 +302,21 @@ function layoutGroups() {
     y += 60;
   }
 }
+
+// -----------------------------
+// Ensure base tiles have home positions after layout
+// -----------------------------
+function setBaseHomes() { // ← NEW
+  for (let s of baseShapes) {
+    s.homeX = s.x;
+    s.homeY = s.y;
+    s.targetX = s.homeX;
+    s.targetY = s.homeY;
+    s.targetScale = 1;
+    s.scale = 1;
+  }
+}
+
 function draw() {
   background(backgroundColor);
 
@@ -316,6 +333,11 @@ function draw() {
   }
 
   for (let s of shapes) {
+    // ensure targetX/Y exist (defensive)
+    if (s.targetX === undefined) s.targetX = s.homeX || 0;
+    if (s.targetY === undefined) s.targetY = s.homeY || 0;
+    if (s.targetScale === undefined) s.targetScale = 1;
+
     s.x = lerp(s.x, s.targetX, 0.15);
     s.y = lerp(s.y, s.targetY, 0.15);
     s.scale = lerp(s.scale, s.targetScale, 0.15);
