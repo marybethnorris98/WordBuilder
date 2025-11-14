@@ -437,4 +437,31 @@ function arrangeShapesInBox() {
 }
 
 function getCurrentWord() {
-  return s
+  return shapes
+    .filter(s => s.inBox)
+    .sort((a, b) => (a.clickIndex || 0) - (b.clickIndex || 0))
+    .map(s => s.label)
+    .join("");
+}
+
+// -----------------------------
+// Reset shapes
+// -----------------------------
+function resetShapes() {
+  shapes = baseShapes.map(b => ({ ...b }));
+  nextClickIndex = 0;
+
+  for (let s of shapes) {
+    s.inBox = false;
+    s.color = s.originalColor;
+    s.scale = 1;
+    s.targetScale = 1;
+    s.clickIndex = null;
+    s.x = s.homeX;
+    s.y = s.homeY;
+    s.targetX = s.homeX;
+    s.targetY = s.homeY;
+  }
+
+  positionResetButton();
+}
