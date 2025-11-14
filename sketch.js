@@ -2,7 +2,7 @@ let baseShapes = [];   // master unique tiles (objects)
 let shapes = [];       // runtime array (base tiles first, clones appended)
 let groups = [];       // CATEGORY_COUNT groups arrays of baseShapes references
 let nextClickIndex = 0;
-let resetButton;
+let resetButton, checkButton, defineButton;
 let buildArea;
 let scaleFactor = 1;
 
@@ -18,6 +18,11 @@ const DESIGN_W = 1600;
 const DESIGN_H = 1400;
 const CATEGORY_COUNT = 18;
 const SAFE_MARGIN = 50;   // about 1/2 inch on most screens
+
+// small UI feedback
+let lastMessage = "";
+let lastMessageTime = 0;    // timestamp (ms)
+const MESSAGE_DURATION = 6000; // ms
 
 // NOTE: disabled font loading for GitHub Pages (CORS-safe)
 function preload() {
@@ -46,27 +51,32 @@ function setup() {
     h: constrain(120 * scaleFactor, 80, 200)
   };
 
-  // reset button (DOM)
+  // RESET button (DOM)
   resetButton = createButton("🔄 Reset");
-  resetButton.style("font-family", "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial");
-  resetButton.style("font-size", "18px");
-  resetButton.style("padding", "10px 14px");
-  resetButton.style("border-radius", "12px");
-  resetButton.style("background", "white");
-  resetButton.style("box-shadow", "0 6px 12px rgba(0,0,0,0.06)");
+  styleAppButton(resetButton);
   resetButton.mousePressed(resetShapes);
+
+  // CHECK button (DOM)
+  checkButton = createButton("✔️ Check Word");
+  styleAppButton(checkButton);
+  checkButton.mousePressed(checkWord);
+
+  // DEFINITION button (DOM)
+  defineButton = createButton("📘 Definition");
+  styleAppButton(defineButton);
+  defineButton.mousePressed(showDefinition);
 
   layoutGroups();
 
   // shapes are copies of baseShapes (so runtime clones can be appended)
   shapes = baseShapes.map(b => ({ ...b }));
 
-  positionResetButton(); 
+  positionButtons();
 }
 
 function windowResized() {
   if (!buildArea) return;
-  
+
   resizeCanvas(windowWidth, windowHeight);
   calculateScale();
 
@@ -78,20 +88,46 @@ function windowResized() {
   categorizeBaseShapes();
   layoutGroups();
   shapes = baseShapes.map(b => ({ ...b }));
-
-function positionResetButton() {
-  const scaledX = buildArea.x * scaleFactor;
-  const scaledY = buildArea.y * scaleFactor;
-  const scaledW = buildArea.w * scaleFactor;
-  const scaledH = buildArea.h * scaleFactor;
-
-  // Center under the white box
-  const btnX = scaledX + scaledW / 2 - resetButton.width / 2;
-  const btnY = scaledY + scaledH + 20;  // 20px under the box
-
-  resetButton.position(btnX, btnY);
+  positionButtons();
 }
 
+function styleAppButton(btn) {
+  btn.style("font-family", "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial");
+  btn.style("font-size", "16px");
+  btn.style("padding", "8px 12px");
+  btn.style("border-radius", "10px");
+  btn.style("background", "white");
+  btn.style("box-shadow", "0 6px 12px rgba(0,0,0,0.06)");
+  // ensure pointer cursor
+  btn.style("cursor", "pointer");
+}
+
+// position three buttons centered under the build area
+function positionButtons() {
+  // buildArea coordinates are in screen pixels (we draw rect at these coords)
+  const areaX = buildArea.x;
+  const areaY = buildArea.y;
+  const areaW = buildArea.w;
+  const areaH = buildArea.h;
+
+  // get actual DOM widths (safely)
+  const wReset  = resetButton && resetButton.elt ? resetButton.elt.offsetWidth : 100;
+  const wCheck  = checkButton && checkButton.elt ? checkButton.elt.offsetWidth : 120;
+  const wDefine = defineButton && defineButton.elt ? defineButton.elt.offsetWidth : 120;
+
+  const gap = 18; // px gap between buttons
+  const totalW = wReset + wCheck + wDefine + gap * 2;
+
+  const startX = areaX + (areaW - totalW) / 2;
+  const y = areaY + areaH + 18;   // 18 px below the white box
+
+  // position (p5 dom positions are page coordinates; canvas at 0,0 so these align)
+  resetButton.position(startX, y);
+  checkButton.position(startX + wReset + gap, y);
+  defineButton.position(startX + wReset + wCheck + gap * 2, y);
+}
+
+// scale calculation
 function calculateScale() {
   // scale relative to canvas size (not window minus margin)
   scaleFactor = min(width / DESIGN_W, height / DESIGN_H);
@@ -312,7 +348,7 @@ function layoutGroups() {
 
   // After placing all blocks, update runtime shapes as copies of baseShapes
   shapes = baseShapes.map(b => ({ ...b }));
-  positionResetButton();
+  positionButtons();
 }
 
 // -----------------------------
@@ -372,6 +408,20 @@ function draw() {
   }
 
   arrangeShapesInBox();
+
+  // small feedback UI under buttons
+  if (lastMessage && millis() - lastMessageTime < MESSAGE_DURATION) {
+    const msgX = buildArea.x + buildArea.w / 2;
+    const msgY = buildArea.y + buildArea.h + 80;
+    push();
+    noStroke();
+    fill("rgba(255,255,255,0.95)");
+    rect(msgX - 260/2, msgY - 28, 260, 56, 10);
+    fill("#222");
+    textSize(14);
+    text(lastMessage, msgX, msgY);
+    pop();
+  }
 }
 
 // -----------------------------
@@ -498,5 +548,82 @@ function resetShapes() {
     s.targetX = s.homeX;
     s.targetY = s.homeY;
   }
-  positionResetButton();
+  positionButtons();
+  lastMessage = "Cleared.";
+  lastMessageTime = millis();
+}
+
+// -----------------------------
+// DICTIONARY: Check word and show definition (Free Dictionary API)
+// -----------------------------
+async function checkWord() {
+  const word = getCurrentWord().toLowerCase();
+
+  if (!word) {
+    lastMessage = "No word to check.";
+    lastMessageTime = millis();
+    return;
+  }
+
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+    if (!res.ok) {
+      lastMessage = `❌ "${word}" is not found.`;
+      lastMessageTime = millis();
+      return;
+    }
+    // word exists
+    lastMessage = `✔️ "${word}" is a real English word.`;
+    lastMessageTime = millis();
+  } catch (err) {
+    lastMessage = "Network error while checking word.";
+    lastMessageTime = millis();
+  }
+}
+
+async function showDefinition() {
+  const word = getCurrentWord().toLowerCase();
+
+  if (!word) {
+    lastMessage = "No word to define.";
+    lastMessageTime = millis();
+    return;
+  }
+
+  try {
+    const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+    if (!res.ok) {
+      lastMessage = `❌ Definition not found for "${word}".`;
+      lastMessageTime = millis();
+      return;
+    }
+
+    const json = await res.json();
+    // try to pull first available definition
+    if (!Array.isArray(json) || json.length === 0) {
+      lastMessage = `❌ No definition available for "${word}".`;
+      lastMessageTime = millis();
+      return;
+    }
+
+    const firstEntry = json[0];
+    const meaning = firstEntry.meanings && firstEntry.meanings[0];
+    const defObj = meaning && meaning.definitions && meaning.definitions[0];
+    const part = meaning && meaning.partOfSpeech ? ` (${meaning.partOfSpeech})` : "";
+    const defText = defObj && defObj.definition ? defObj.definition : null;
+    const example = defObj && defObj.example ? `\n\n“${defObj.example}”` : "";
+
+    if (!defText) {
+      lastMessage = `❌ No definition available for "${word}".`;
+      lastMessageTime = millis();
+      return;
+    }
+
+    // show formatted short definition in the feedback area
+    lastMessage = `📘 ${word}${part}: ${defText}${example}`;
+    lastMessageTime = millis();
+  } catch (err) {
+    lastMessage = "Network error while fetching definition.";
+    lastMessageTime = millis();
+  }
 }
