@@ -1,14 +1,14 @@
 let baseShapes = [];   // master unique tiles (objects)
 let shapes = [];       // runtime array (base tiles first, clones appended)
-let groups = [];       // 18 groups arrays of baseShapes references
+let groups = [];       // CATEGORY_COUNT groups arrays of baseShapes references
 let nextClickIndex = 0;
 let resetButton;
 let buildArea;
 let scaleFactor = 1;
 
-// --- DESIGN / layout settings
+// design reference
 const DESIGN_W = 1600;
-const DESIGN_H = 2000;
+const DESIGN_H = 1400;
 const CATEGORY_COUNT = 18;
 
 function setup() {
@@ -20,31 +20,8 @@ function setup() {
   createBaseShapesFromFullList();
   categorizeBaseShapes();
   calculateScale();
-  layoutGroups();
 
-  shapes = baseShapes.map(b => ({ ...b }));
-
-  resetButton = createButton("🔄 Reset");
-  resetButton.style("font-size", "18px");
-  resetButton.mousePressed(resetShapes);
-  positionResetButton();
-}
-
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  calculateScale();
-  layoutGroups();
-  shapes = baseShapes.map(b => ({ ...b }));
-  positionResetButton();
-}
-
-function positionResetButton() {
-  resetButton.position(width * 0.86, buildArea.y + buildArea.h + 12);
-}
-
-// ---- helper scale functions (uniform)
-function calculateScale() {
-  scaleFactor = min(windowWidth / DESIGN_W, windowHeight / DESIGN_H);
+  // initial buildArea sizing (will be recalculated in layoutGroups too)
   const margin = 0.05 * width;
   buildArea = {
     x: margin,
@@ -52,8 +29,47 @@ function calculateScale() {
     w: width - margin * 2,
     h: constrain(120 * scaleFactor, 80, 200)
   };
+
+  // reset button
+  resetButton = createButton("🔄 Reset");
+  resetButton.style("font-size", "18px");
+  resetButton.mousePressed(resetShapes);
+
+  layoutGroups();
+
+  // shapes are copies of baseShapes (so runtime clones can be appended)
+  shapes = baseShapes.map(b => ({ ...b }));
+
+  positionResetButton();
 }
 
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  calculateScale();
+  buildArea.w = width - 0.05 * width * 2;
+  buildArea.y = 0.03 * height;
+  buildArea.h = constrain(120 * scaleFactor, 80, 200);
+  categorizeBaseShapes(); // re-calc colors/groups (safe)
+  layoutGroups();
+  shapes = baseShapes.map(b => ({ ...b }));
+  positionResetButton();
+}
+
+function positionResetButton() {
+  // keep the reset button visible and not off-screen
+  const btnX = width * 0.86;
+  const desiredY = buildArea.y + buildArea.h + 12;
+  const btnY = min(desiredY, height - 40);
+  resetButton.position(btnX, btnY);
+}
+
+function calculateScale() {
+  scaleFactor = min(windowWidth / DESIGN_W, windowHeight / DESIGN_H);
+}
+
+// -----------------------------
+// Base shapes (full list)
+// -----------------------------
 function createBaseShapesFromFullList() {
   const raw = [
     // single letters a–z
@@ -90,19 +106,20 @@ function createBaseShapesFromFullList() {
     "-es","-less","-ness","-ment","-ful","-ish","-en","-tion","-sion",
     "-ed","-ic","-ing",
 
-    // y endings
+    // y-endings
     "-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy","-py","-sy","-ty",
 
     // -le patterns
     "-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle",
 
-    // oddballs & repeats
+    // oddballs and repeats
     "ph","kn-","gn","wr-","-mb","-mn",
     "ai","ea","oa","ee","ie","oo","igh","eigh","ough","augh","ei",
     "-ew","-ey","ie","-ue","ui","au","aw",
     "-s","-ff","-ll","-ss","-zz","-ck","tch","-dge","-nch","-oy","-oy","-oe"
   ];
 
+  // remove duplicates while preserving order
   const seen = new Set();
   const uniq = [];
   for (let t of raw) {
@@ -111,6 +128,7 @@ function createBaseShapesFromFullList() {
       uniq.push(t);
     }
   }
+
   baseShapes = uniq.map(lbl => ({
     label: lbl,
     w: 70, h: 44,
@@ -128,7 +146,11 @@ function createBaseShapesFromFullList() {
   }));
 }
 
+// -----------------------------
+// Categorize
+// -----------------------------
 function categorizeBaseShapes() {
+  // preserve hyphens for matching sets that include them
   const singleLetters = new Set("abcdefghijklmnopqrstuvwxyz".split(""));
   const digraphs = new Set(["ch","sh","th","wh","qu","ph","tch","dge","ck","ff","ll","ss","zz","gn","kn","wr","mb","mn"]);
   const lBlends = new Set(["bl-","cl-","fl-","gl-","pl-","sl-"]);
@@ -137,34 +159,26 @@ function categorizeBaseShapes() {
   const threeLetter = new Set(["scr-","shr-","spl-","spr-","squ-","str-","thr-"]);
   const wBlends = new Set(["dw-","sw-","tw-"]);
 
-  const vowelTeam1 = new Set(["ai","ea","oa","ay","ee","oe","ou","ow",
-    "oi","oy","igh","oo","au","aw"]);
-  const vowelTeam2 = new Set(["eigh","ei","ew","ey","ie","ough","ue",
-    "ui","augh"]);
+  const vowelTeam1 = new Set(["ai","ea","oa","ay","ee","oe","ou","ow","oi","oy","igh","oo","au","aw"]);
+  const vowelTeam2 = new Set(["eigh","ei","ew","ey","ie","ough","ue","ui","augh"]);
 
   const rControl = new Set(["er","ir","ur","ar","or","war","wor"]);
   const ngnk = new Set(["-ing","-ang","-ong","-ung","-ink","-ank","-onk","-unk"]);
-  const finalClusters = new Set(["-ld","-lf","-lk","-lp","-lt","-ct","-ft",
-    "-nt","-pt","-st","-xt","-mp","-nd","-sk","-sp","-nch","-tch","-dge"]);
+  const finalClusters = new Set(["-ld","-lf","-lk","-lp","-lt","-ct","-ft","-nt","-pt","-st","-xt","-mp","-nd","-sk","-sp","-nch","-tch","-dge"]);
 
-  const prefixes = new Set(["un-","sub-","con-","in-","mis-","de-","re-",
-    "pro-","pre-","be-"]);
-
-  const suffixes = new Set(["-es","-less","-ness","-ment","-ful","-ish","-en",
-    "-tion","-sion","-ed","-ic","-ing"]);
+  const prefixes = new Set(["un-","sub-","con-","in-","mis-","de-","re-","pro-","pre-","be-"]);
+  const suffixes = new Set(["-es","-less","-ness","-ment","-ful","-ish","-en","-tion","-sion","-ed","-ic","-ing"]);
 
   const magicE = new Set(["*e","a_e","e_e","i_e","o_e","u_e","y_e"]);
-  const yEndings = new Set(["-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy",
-    "-py","-sy","-ty"]);
-  const leSyllables = new Set(["-ble","-cle","-dle","-fle","-gle","-kle",
-    "-ple","-tle","-zle"]);
+  const yEndings = new Set(["-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy","-py","-sy","-ty"]);
+  const leSyllables = new Set(["-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle"]);
   const oddballs = new Set(["y","-ild","-old","-olt","-ind","augh","ough"]);
 
+  // reset groups
   groups = Array.from({length: CATEGORY_COUNT}, () => []);
 
   for (let s of baseShapes) {
-
-    // 🔥 FIXED — keep hyphens
+    // keep hyphens (they are meaningful for e.g. "-ing", "un-")
     const lbl = s.label.toLowerCase().replace(/_/g, "");
 
     let g = null;
@@ -187,139 +201,101 @@ function categorizeBaseShapes() {
     else if (yEndings.has(s.label)) g = 15;
     else if (oddballs.has(s.label)) g = 16;
     else if (leSyllables.has(s.label)) g = 17;
-    else g = 16;
+    else g = 16; // fallback to oddballs
 
     s.groupIndex = g;
     groups[g].push(s);
   }
 
-  // --- colors
+  // colors by category
   for (let s of baseShapes) {
     const g = s.groupIndex;
     if (g === 0 && /^[aeiouy]$/.test(s.label)) s.originalColor = "lightyellow";
-    else if (g === 7 || g === 8 || g === 14) s.originalColor = "lightyellow";
-    else if (g === 12 || g === 13) s.originalColor = "lightgreen";
+    else if (g === 7 || g === 8 || g === 14) s.originalColor = "lightyellow"; // vowels, teams, magic-e
+    else if (g === 12 || g === 13) s.originalColor = "lightgreen"; // prefixes/suffixes
     else s.originalColor = "white";
     s.color = s.originalColor;
   }
 }
 
+// -----------------------------
+// Layout: BLOCK WRAP (whole blocks wrap)
+// -----------------------------
 function layoutGroups() {
   calculateScale();
 
-  const rowPlan = [
-    [0],
-    [1],
-    [2, 3, 4],
-    [7],
-    [8],
-    [12],
-    [13],
-    [5, 6, 9, 10],
-    [11, 14, 15],
-    [16, 17]
-  ];
+  const leftMargin = 50;
+  const rightMargin = 50;
+  const maxRowWidth = width - leftMargin - rightMargin;
 
-  const top = buildArea.y + buildArea.h + 30 * scaleFactor;
-  const rowGap = max(35 * scaleFactor, height * 0.03);
-  const blockGap = 70 * scaleFactor;
-
-  const availableW = width * 0.9;
-  const leftMargin = (width - availableW) / 2;
-
-  const baseTileW = constrain(floor(70 * scaleFactor), 40, 140);
-  const baseTileH = constrain(floor(44 * scaleFactor), 28, 80);
+  // tile/base sizes
+  const baseTileW = constrain(floor(70 * scaleFactor), 36, 140);
+  const baseTileH = constrain(floor(44 * scaleFactor), 24, 80);
   const tileGap = max(8 * scaleFactor, 6);
+  const blockGap = max(40 * scaleFactor, 24);
+  const rowGap = max(30 * scaleFactor, 18);
 
-  let y = top;
+  let y = buildArea.y + buildArea.h + 30 * scaleFactor;
+  let currentRowWidth = 0;
 
-  for (let row of rowPlan) {
-    let blocks = [];
-    let totalRowWidth = 0;
+  // We'll build a new list of baseShapes positions based on groups (wrapping blocks)
+  for (let gi = 0; gi < groups.length; gi++) {
+    const block = groups[gi];
+    if (!block || block.length === 0) continue;
 
-    for (let gi of row) {
-      const items = groups[gi] || [];
-      const maxCols = max(1, floor((availableW * 0.9 + tileGap) / (baseTileW + tileGap)));
-      const cols = min(items.length, maxCols);
-      const rowsNeeded = items.length ? ceil(items.length / cols) : 0;
+    // measure block width (all tiles placed in one row inside the block)
+    const blockWidth = block.length * baseTileW + (block.length - 1) * tileGap;
 
-      const width = cols > 0 ? cols * baseTileW + (cols - 1) * tileGap : 0;
-      const height = rowsNeeded * (baseTileH + tileGap) - tileGap;
-
-      blocks.push({ gi, items, width, height, rows: rowsNeeded });
-      totalRowWidth += width;
+    // if the block cannot fit on the current row, wrap to next row
+    if (currentRowWidth > 0 && currentRowWidth + blockWidth > maxRowWidth) {
+      // new row
+      y += baseTileH + rowGap;
+      currentRowWidth = 0;
     }
 
-    totalRowWidth += blockGap * (row.length - 1);
+    // starting X for this block
+    let blockStartX = leftMargin + currentRowWidth;
 
-    let startX = leftMargin + (availableW - totalRowWidth) / 2;
-    let blockX = startX;
+    // place each tile in this block
+    for (let i = 0; i < block.length; i++) {
+      const s = block[i];
 
-    for (let block of blocks) {
-      const { items, width, height, rows } = block;
-
-      if (items.length > 0) {
-        stroke(200);
-        strokeWeight(2);
-        noFill();
-        rect(
-          blockX - 10 * scaleFactor,
-          y - 10 * scaleFactor,
-          width + 20 * scaleFactor,
-          height + 20 * scaleFactor,
-          10 * scaleFactor
-        );
-      }
-
-      if (items.length > 0) {
-        const maxCols = max(1, floor((availableW * 0.9 + tileGap) / (baseTileW + tileGap)));
-        const cols = min(items.length, maxCols);
-        const rowsNeeded = ceil(items.length / cols);
-
-        let idx = 0;
-        for (let r = 0; r < rowsNeeded; r++) {
-          const countInRow = min(cols, items.length - r * cols);
-          const rowWidth = countInRow * baseTileW + (countInRow - 1) * tileGap;
-          const rowStartX = blockX + (width - rowWidth) / 2;
-
-          for (let c = 0; c < countInRow; c++) {
-            const s = items[idx++];
-
-            s.w = baseTileW;
-            s.h = baseTileH;
-            s.homeX = rowStartX + c * (baseTileW + tileGap);
-            s.homeY = y + r * (baseTileH + tileGap);
-            s.x = s.homeX;
-            s.y = s.homeY;
-            s.targetX = s.homeX;
-            s.targetY = s.homeY;
-            s.scale = 1;
-            s.targetScale = 1;
-            s.color = s.originalColor;
-            s.inBox = false;
-            s.isBase = true;
-          }
-        }
-      }
-
-      blockX += width + blockGap;
+      s.w = baseTileW;
+      s.h = baseTileH;
+      s.homeX = blockStartX + i * (baseTileW + tileGap);
+      s.homeY = y;
+      s.x = s.homeX;
+      s.y = s.homeY;
+      s.targetX = s.homeX;
+      s.targetY = s.homeY;
+      s.scale = 1;
+      s.targetScale = 1;
+      s.color = s.originalColor;
+      s.inBox = false;
+      s.isBase = true;
     }
 
-    const tallestRows = max(...blocks.map(b => b.rows));
-    const tallestHeight = tallestRows * (baseTileH + tileGap);
-    y += tallestHeight + rowGap;
+    // advance currentRowWidth (block + gap)
+    currentRowWidth += blockWidth + blockGap;
   }
 
+  // After placing all blocks, update runtime shapes as copies of baseShapes
   shapes = baseShapes.map(b => ({ ...b }));
+  positionResetButton();
 }
 
+// -----------------------------
+// Draw loop
+// -----------------------------
 function draw() {
   background(245);
 
+  // draw build area
   stroke(180);
   fill(255);
   rect(buildArea.x, buildArea.y, buildArea.w, buildArea.h, 12 * scaleFactor);
 
+  // hint text when empty
   const inBox = shapes.filter(s => s.inBox);
   if (inBox.length === 0) {
     noStroke();
@@ -328,12 +304,14 @@ function draw() {
     text("🧱 Click letters to build a word", buildArea.x + buildArea.w / 2, buildArea.y + buildArea.h / 2);
   }
 
+  // animate movement/scale
   for (let s of shapes) {
     s.x = lerp(s.x, s.targetX, 0.15);
     s.y = lerp(s.y, s.targetY, 0.15);
     s.scale = lerp(s.scale, s.targetScale, 0.15);
   }
 
+  // draw shapes
   for (let s of shapes) {
     fill(s.color || "white");
     stroke(200);
@@ -341,21 +319,25 @@ function draw() {
     noStroke();
     fill(0);
     textSize(s.inBox ? min(48 * scaleFactor, s.h * 0.9) : min(20 * scaleFactor, s.h * 0.6));
+    // draw label
     text(s.label, s.x + (s.w * s.scale) / 2, s.y + (s.h * s.scale) / 2);
   }
 
   arrangeShapesInBox();
 }
 
+// -----------------------------
+// Mouse press: click base or clone
+// -----------------------------
 function mousePressed() {
+  // iterate top-down so later shapes (clones) can be removed if clicked
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i];
     const sw = s.w * s.scale;
     const sh = s.h * s.scale;
-
     if (mouseX > s.x && mouseX < s.x + sw && mouseY > s.y && mouseY < s.y + sh) {
       if (s.isBase) {
-
+        // create a clone (keep original category color)
         const clone = {
           label: s.label,
           w: s.w, h: s.h,
@@ -368,14 +350,14 @@ function mousePressed() {
           inBox: true,
           scale: 1,
           targetScale: 1.5,
-          clickIndex: nextClickIndex++
+          clickIndex: nextClickIndex++,
+          groupIndex: s.groupIndex
         };
-
         shapes.push(clone);
         arrangeShapesInBox();
         return;
-
       } else {
+        // clicked a clone -> remove it
         shapes.splice(i, 1);
         arrangeShapesInBox();
         return;
@@ -384,12 +366,16 @@ function mousePressed() {
   }
 }
 
+// -----------------------------
+// Arrange shapes that are in the top box
+// -----------------------------
 function arrangeShapesInBox() {
   const inBox = shapes
     .filter(s => s.inBox)
-    .sort((a, b) => a.clickIndex - b.clickIndex);
+    .sort((a, b) => (a.clickIndex || 0) - (b.clickIndex || 0));
 
   if (inBox.length === 0) {
+    // return bases back to their home positions
     for (let s of shapes) {
       if (s.isBase) {
         s.targetX = s.homeX;
@@ -401,7 +387,9 @@ function arrangeShapesInBox() {
     return;
   }
 
+  // spacing logic for box
   const spacing = max(8 * scaleFactor, 8);
+  // compute available width per tile with padding
   const maxLetterW = min(160 * scaleFactor, buildArea.w / inBox.length * 0.9);
   const letterW = max(40 * scaleFactor, maxLetterW);
   const totalW = inBox.length * letterW + (inBox.length - 1) * spacing;
@@ -411,7 +399,6 @@ function arrangeShapesInBox() {
 
   let x = startX;
   for (let t of inBox) {
-
     t.targetX = x;
     t.targetY = centerY - (t.h * t.targetScale) / 2;
 
@@ -419,14 +406,15 @@ function arrangeShapesInBox() {
     if (base) {
       t.color = base.originalColor;
     } else {
-      t.color = "white";
+      t.color = 'white';
     }
-
+    // scale to fit box height (but keep within a cap)
     t.targetScale = min(2.0, (buildArea.h / t.h) * 0.9);
 
     x += letterW + spacing;
   }
 
+  // ensure all base tiles remain at home positions visually
   for (let s of shapes) {
     if (s.isBase) {
       s.targetX = s.homeX;
@@ -440,11 +428,14 @@ function arrangeShapesInBox() {
 function getCurrentWord() {
   return shapes
     .filter(s => s.inBox)
-    .sort((a, b) => a.clickIndex - b.clickIndex)
+    .sort((a, b) => (a.clickIndex || 0) - (b.clickIndex || 0))
     .map(s => s.label)
     .join("");
 }
 
+// -----------------------------
+// Reset shapes (clear top box)
+// -----------------------------
 function resetShapes() {
   shapes = baseShapes.map(b => ({ ...b }));
   nextClickIndex = 0;
@@ -459,4 +450,5 @@ function resetShapes() {
     s.targetX = s.homeX;
     s.targetY = s.homeY;
   }
+  positionResetButton();
 }
