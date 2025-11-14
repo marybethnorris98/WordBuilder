@@ -11,7 +11,7 @@ let mainFont;
 let canvasEl; // p5 canvas element so we can position it with SAFE_MARGIN
 
 // THEME / UI
-const backgroundColor = [250, 248, 240];    // warm off-white (r,g,b)
+const backgroundColor = [#FAF8F0];    // warm off-white (r,g,b)
 const buildAreaColor = [255, 255, 255, 230]; // slightly translucent white (r,g,b,alpha)
 const tileShadowColor = [0, 0, 0, 22];      // subtle shadow (r,g,b,alpha)
 const tileCorner = 12;                      // rounded corner radius
@@ -249,7 +249,7 @@ function categorizeBaseShapes() {
   }
 
   // colors by category (use pastel hex values)
-  const COLOR_YELLOW = "#FFF7C8";
+  const COLOR_YELLOW = "255, 247, 200";
   const COLOR_GREEN  = "#E6F6DF";
   const COLOR_WHITE  = "#FFFFFF";
 
