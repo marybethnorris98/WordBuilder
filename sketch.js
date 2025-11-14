@@ -22,10 +22,8 @@ function setup() {
   calculateScale();
   layoutGroups();
 
-  // shapes initially are copies of baseShapes (so we can push clones later)
   shapes = baseShapes.map(b => ({ ...b }));
 
-  // reset button
   resetButton = createButton("🔄 Reset");
   resetButton.style("font-size", "18px");
   resetButton.mousePressed(resetShapes);
@@ -55,6 +53,7 @@ function calculateScale() {
     h: constrain(120 * scaleFactor, 80, 200)
   };
 }
+
 function createBaseShapesFromFullList() {
   const raw = [
     // single letters a–z
@@ -91,13 +90,13 @@ function createBaseShapesFromFullList() {
     "-es","-less","-ness","-ment","-ful","-ish","-en","-tion","-sion",
     "-ed","-ic","-ing",
 
-    // y-endings
+    // y endings
     "-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy","-py","-sy","-ty",
 
     // -le patterns
     "-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle",
 
-    // oddballs and repeats
+    // oddballs & repeats
     "ph","kn-","gn","wr-","-mb","-mn",
     "ai","ea","oa","ee","ie","oo","igh","eigh","ough","augh","ei",
     "-ew","-ey","ie","-ue","ui","au","aw",
@@ -128,6 +127,7 @@ function createBaseShapesFromFullList() {
     groupIndex: null
   }));
 }
+
 function categorizeBaseShapes() {
   const singleLetters = new Set("abcdefghijklmnopqrstuvwxyz".split(""));
   const digraphs = new Set(["ch","sh","th","wh","qu","ph","tch","dge","ck","ff","ll","ss","zz","gn","kn","wr","mb","mn"]);
@@ -163,7 +163,9 @@ function categorizeBaseShapes() {
   groups = Array.from({length: CATEGORY_COUNT}, () => []);
 
   for (let s of baseShapes) {
-    const lbl = s.label.toLowerCase().replace(/_/g, "").replace(/-/g, "");
+
+    // 🔥 FIXED — keep hyphens
+    const lbl = s.label.toLowerCase().replace(/_/g, "");
 
     let g = null;
 
@@ -201,26 +203,22 @@ function categorizeBaseShapes() {
     s.color = s.originalColor;
   }
 }
+
 function layoutGroups() {
   calculateScale();
 
   const rowPlan = [
-  [0],          // Single letters (a-z)
-  [1],          // Digraphs
-
-  [2, 3, 4],    // L-blends, R-blends, S-blends
-
-  [7],          // Vowel teams 1
-  [8],          // Vowel teams 2
-
-  [12],         // Prefixes
-  [13],         // Suffixes
-
-  // Everything else split into two rows
-  [5, 6, 9, 10],  
-  [11, 14, 15],
-  [16, 17]
-];
+    [0],
+    [1],
+    [2, 3, 4],
+    [7],
+    [8],
+    [12],
+    [13],
+    [5, 6, 9, 10],
+    [11, 14, 15],
+    [16, 17]
+  ];
 
   const top = buildArea.y + buildArea.h + 30 * scaleFactor;
   const rowGap = max(35 * scaleFactor, height * 0.03);
@@ -239,7 +237,6 @@ function layoutGroups() {
     let blocks = [];
     let totalRowWidth = 0;
 
-    // --- First pass: measure each block ---
     for (let gi of row) {
       const items = groups[gi] || [];
       const maxCols = max(1, floor((availableW * 0.9 + tileGap) / (baseTileW + tileGap)));
@@ -258,11 +255,9 @@ function layoutGroups() {
     let startX = leftMargin + (availableW - totalRowWidth) / 2;
     let blockX = startX;
 
-    // --- Second pass: draw blocks and position tiles ---
     for (let block of blocks) {
       const { items, width, height, rows } = block;
 
-      // BORDER
       if (items.length > 0) {
         stroke(200);
         strokeWeight(2);
@@ -276,7 +271,6 @@ function layoutGroups() {
         );
       }
 
-      // TILE PLACEMENT
       if (items.length > 0) {
         const maxCols = max(1, floor((availableW * 0.9 + tileGap) / (baseTileW + tileGap)));
         const cols = min(items.length, maxCols);
@@ -318,15 +312,14 @@ function layoutGroups() {
 
   shapes = baseShapes.map(b => ({ ...b }));
 }
+
 function draw() {
   background(245);
 
-  // build area
   stroke(180);
   fill(255);
   rect(buildArea.x, buildArea.y, buildArea.w, buildArea.h, 12 * scaleFactor);
 
-  // hint text
   const inBox = shapes.filter(s => s.inBox);
   if (inBox.length === 0) {
     noStroke();
@@ -335,14 +328,12 @@ function draw() {
     text("🧱 Click letters to build a word", buildArea.x + buildArea.w / 2, buildArea.y + buildArea.h / 2);
   }
 
-  // animate
   for (let s of shapes) {
     s.x = lerp(s.x, s.targetX, 0.15);
     s.y = lerp(s.y, s.targetY, 0.15);
     s.scale = lerp(s.scale, s.targetScale, 0.15);
   }
 
-  // draw shapes
   for (let s of shapes) {
     fill(s.color || "white");
     stroke(200);
@@ -355,6 +346,7 @@ function draw() {
 
   arrangeShapesInBox();
 }
+
 function mousePressed() {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i];
@@ -363,27 +355,26 @@ function mousePressed() {
 
     if (mouseX > s.x && mouseX < s.x + sw && mouseY > s.y && mouseY < s.y + sh) {
       if (s.isBase) {
+
         const clone = {
-  label: s.label,
-  w: s.w, h: s.h,
-  x: s.homeX, y: s.homeY,
-  homeX: s.homeX, homeY: s.homeY,
-  targetX: s.homeX, targetY: s.homeY,
-  
-  // FIXED: use correct category color
-  color: s.originalColor,
-  originalColor: s.originalColor,
+          label: s.label,
+          w: s.w, h: s.h,
+          x: s.homeX, y: s.homeY,
+          homeX: s.homeX, homeY: s.homeY,
+          targetX: s.homeX, targetY: s.homeY,
+          color: s.originalColor,
+          originalColor: s.originalColor,
+          isBase: false,
+          inBox: true,
+          scale: 1,
+          targetScale: 1.5,
+          clickIndex: nextClickIndex++
+        };
 
-  isBase: false,
-  inBox: true,
-
-  scale: 1,
-  targetScale: 1.5,
-  clickIndex: nextClickIndex++
-};
         shapes.push(clone);
         arrangeShapesInBox();
         return;
+
       } else {
         shapes.splice(i, 1);
         arrangeShapesInBox();
@@ -392,6 +383,7 @@ function mousePressed() {
     }
   }
 }
+
 function arrangeShapesInBox() {
   const inBox = shapes
     .filter(s => s.inBox)
@@ -419,15 +411,17 @@ function arrangeShapesInBox() {
 
   let x = startX;
   for (let t of inBox) {
+
     t.targetX = x;
     t.targetY = centerY - (t.h * t.targetScale) / 2;
 
     const base = baseShapes.find(b => b.label === t.label);
     if (base) {
-  t.color = base.originalColor;   // keep the real category color
-} else {
-  t.color = 'white';
-}
+      t.color = base.originalColor;
+    } else {
+      t.color = "white";
+    }
+
     t.targetScale = min(2.0, (buildArea.h / t.h) * 0.9);
 
     x += letterW + spacing;
@@ -442,6 +436,7 @@ function arrangeShapesInBox() {
     }
   }
 }
+
 function getCurrentWord() {
   return shapes
     .filter(s => s.inBox)
