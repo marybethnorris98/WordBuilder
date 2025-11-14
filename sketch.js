@@ -10,9 +10,11 @@ let scaleFactor = 1;
 const DESIGN_W = 1600;
 const DESIGN_H = 1400;
 const CATEGORY_COUNT = 18;
+const SAFE_MARGIN = 50;   // about 1/2 inch on most screens
+
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  createCanvas(windowWidth - SAFE_MARGIN * 2, windowHeight - SAFE_MARGIN * 2);
   textAlign(CENTER, CENTER);
   rectMode(CORNER);
   noStroke();
@@ -224,10 +226,10 @@ function categorizeBaseShapes() {
 function layoutGroups() {
   calculateScale();
 
-  const leftMargin = 50;
-  const rightMargin = 50;
-  const maxRowWidth = width - leftMargin - rightMargin;
-
+ const leftMargin = SAFE_MARGIN;
+const rightMargin = SAFE_MARGIN;
+const maxRowWidth = width - SAFE_MARGIN * 2;
+  
   // tile/base sizes
   const baseTileW = constrain(floor(70 * scaleFactor), 36, 140);
   const baseTileH = constrain(floor(44 * scaleFactor), 24, 80);
