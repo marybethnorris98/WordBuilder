@@ -318,7 +318,11 @@ function draw() {
     rect(s.x, s.y, s.w * s.scale, s.h * s.scale, 8 * scaleFactor);
     noStroke();
     fill(0);
-    textSize(s.inBox ? min(48 * scaleFactor, s.h * 0.9) : min(20 * scaleFactor, s.h * 0.6));
+    textSize(
+  s.inBox
+    ? s.h * s.scale * 0.82
+    : s.h * s.scale * 0.58
+);
     // draw label
     text(s.label, s.x + (s.w * s.scale) / 2, s.y + (s.h * s.scale) / 2);
   }
