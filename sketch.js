@@ -364,11 +364,6 @@ function draw() {
 
   arrangeShapesInBox();
 }
-
-// -----------------------------------------
-// --- INPUT HANDLING ----------------------
-// -----------------------------------------
-
 function mousePressed() {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i];
