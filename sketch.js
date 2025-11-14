@@ -36,8 +36,6 @@ function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   calculateScale();
   layoutGroups();
-  // refresh runtime shapes (keep clones removed on resize)
-  // ensure baseShapes remain first in shapes
   shapes = baseShapes.map(b => ({ ...b }));
   positionResetButton();
 }
@@ -49,7 +47,6 @@ function positionResetButton() {
 // ---- helper scale functions (uniform)
 function calculateScale() {
   scaleFactor = min(windowWidth / DESIGN_W, windowHeight / DESIGN_H);
-  // setup buildArea relative to scaled design
   const margin = 0.05 * width;
   buildArea = {
     x: margin,
@@ -59,16 +56,17 @@ function calculateScale() {
   };
 }
 
-// --- FULL master label list (collated from your provided tiles)
-// keep duplicates in source, will be deduped preserving order
+// -----------------------------------------
+// --- LIST + TILE CREATION ----------------
+// -----------------------------------------
+
 function createBaseShapesFromFullList() {
   const raw = [
-    // single letters a-m
+    // single letters a–z
     "a","b","c","d","e","f","g","h","i","j","k","l","m",
-    // n-z
     "n","o","p","q","r","s","t","u","v","w","x","y","z",
 
-    // clusters and digraphs from your list
+    // digraphs, blends, clusters
     "ch","sh","th","wh","qu","-ck","-s","-ff","-ll","-ss","-zz",
     "-ing","-ang","-ong","-ung","-ink","-ank","-onk","-unk",
     "bl-","cl-","fl-","gl-","pl-","sl-",
@@ -76,35 +74,41 @@ function createBaseShapesFromFullList() {
     "sc-","sk-","sm-","sn-","sp-","st-",
     "scr-","shr-","spl-","spr-","squ-","str-","thr-",
     "dw-","sw-","tw-",
-    // endings / final clusters
-    "-ld","-lf","-lk","-lp","-lt","-ct","-ft","-nt","-pt","-st","-xt","-mp","-nd","-sk","-sp","-nch","-tch","-dge",
 
-    // vowel teams (many)
-    "ai","ea","oa","-ay","ee","-oe","ou","ow","oi","-oy","au","aw","oo","eigh","ei","-ew","-ey","ie","igh","-ue","ui","oe","augh","ough",
+    // final clusters
+    "-ld","-lf","-lk","-lp","-lt","-ct","-ft","-nt","-pt","-st","-xt",
+    "-mp","-nd","-sk","-sp","-nch","-tch","-dge",
 
-    // magic-e / starred
+    // vowel teams
+    "ai","ea","oa","-ay","ee","-oe","ou","ow","oi","-oy","au","aw",
+    "oo","eigh","ei","-ew","-ey","ie","igh","-ue","ui","oe","augh","ough",
+
+    // magic-e
     "*e","a_e","e_e","i_e","o_e","u_e","y_e",
 
-    // r-controlled and similar
+    // r-controlled
     "er","ir","ur","ar","or","war","wor",
 
-    // prefixes (prefix list)
+    // prefixes
     "un-","sub-","con-","in-","mis-","de-","re-","pro-","pre-","be-",
 
-    // suffixes (common)
-    "-es","-less","-ness","-ment","-ful","-ish","-en","-tion","-sion","-ed","-ic","-ing",
+    // suffixes
+    "-es","-less","-ness","-ment","-ful","-ish","-en","-tion","-sion",
+    "-ed","-ic","-ing",
 
-    // y-endings & odd endings
+    // y-endings
     "-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy","-py","-sy","-ty",
-    // other endings / patterns
-    "-ild","-old","-olt","-ind","-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle",
-    "dw-","sw-","tw-","ph","kn-","gn","wr-","-mb","-mn",
-    "ai","ea","oa","ee","ie","oo","igh","eigh","ough","augh","ei","-ew","-ey","ie","-ue","ui","au","aw",
-    // some repeats & additional items from your list
+
+    // -le patterns
+    "-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle",
+
+    // oddballs and repeats
+    "ph","kn-","gn","wr-","-mb","-mn",
+    "ai","ea","oa","ee","ie","oo","igh","eigh","ough","augh","ei",
+    "-ew","-ey","ie","-ue","ui","au","aw",
     "-s","-ff","-ll","-ss","-zz","-ck","tch","-dge","-nch","-oy","-oy","-oe"
   ];
 
-  // dedupe preserving order
   const seen = new Set();
   const uniq = [];
   for (let t of raw) {
@@ -114,159 +118,111 @@ function createBaseShapesFromFullList() {
     }
   }
 
-  baseShapes = uniq.map(lbl => {
-    return {
-      label: lbl,
-      w: 70, h: 44,           // base tile size (will be adjusted in layout)
-      x: 0, y: 0,
-      homeX: 0, homeY: 0,
-      targetX: 0, targetY: 0,
-      color: "white",
-      originalColor: "white",
-      isBase: true,
-      inBox: false,
-      scale: 1,
-      targetScale: 1,
-      clickIndex: null,
-      groupIndex: null
-    };
-  });
+  baseShapes = uniq.map(lbl => ({
+    label: lbl,
+    w: 70, h: 44,
+    x: 0, y: 0,
+    homeX: 0, homeY: 0,
+    targetX: 0, targetY: 0,
+    color: "white",
+    originalColor: "white",
+    isBase: true,
+    inBox: false,
+    scale: 1,
+    targetScale: 1,
+    clickIndex: null,
+    groupIndex: null
+  }));
 }
 
-// --- categorizer: map each label into one of 18 groups
+// -----------------------------------------
+// --- CATEGORIZER -------------------------
+// -----------------------------------------
 function categorizeBaseShapes() {
-  // prepare sets / lists for exact matching
   const singleLetters = new Set("abcdefghijklmnopqrstuvwxyz".split(""));
-  const digraphs = new Set(["ch","sh","th","wh","qu","ph","tch","dge","-ck","-ff","-ll","-ss","-zz","gn","kn-","wr-","-mb","-mn"]);
+  const digraphs = new Set(["ch","sh","th","wh","qu","ph","tch","dge","ck","ff","ll","ss","zz","gn","kn","wr","mb","mn"]);
   const lBlends = new Set(["bl-","cl-","fl-","gl-","pl-","sl-"]);
   const rBlends = new Set(["br-","cr-","dr-","fr-","gr-","pr-","tr-"]);
   const sBlends = new Set(["sc-","sk-","sm-","sn-","sp-","st-"]);
   const threeLetter = new Set(["scr-","shr-","spl-","spr-","squ-","str-","thr-"]);
   const wBlends = new Set(["dw-","sw-","tw-"]);
-  const vowelTeam1 = new Set(["ai","ea","oa","-ay","ee","-oe","ou","ow","oi","-oy","igh","oo","au","aw","oy","oe"]);
-  const vowelTeam2 = new Set(["eigh","ei","-ew","-ey","ie","ough","-ue","ui","au","aw","oe","augh","ei"]);
+
+  const vowelTeam1 = new Set(["ai","ea","oa","ay","ee","oe","ou","ow",
+    "oi","oy","igh","oo","au","aw"]);
+  const vowelTeam2 = new Set(["eigh","ei","ew","ey","ie","ough","ue",
+    "ui","augh"]);
+
   const rControl = new Set(["er","ir","ur","ar","or","war","wor"]);
   const ngnk = new Set(["-ing","-ang","-ong","-ung","-ink","-ank","-onk","-unk"]);
-  const finalClusters = new Set(["-ld","-lf","-lk","-lp","-lt","-ct","-ft","-nt","-pt","-st","-xt","-mp","-nd","-sk","-sp","-nch","-tch","-dge"]);
-  const prefixes = new Set(["un-","sub-","con-","in-","mis-","de-","re-","pro-","pre-","be-"]);
-  const suffixes = new Set(["-es","-less","-ness","-ment","-ful","-ish","-en","-tion","-sion","-ed","-ic","-ing"]);
+  const finalClusters = new Set(["-ld","-lf","-lk","-lp","-lt","-ct","-ft",
+    "-nt","-pt","-st","-xt","-mp","-nd","-sk","-sp","-nch","-tch","-dge"]);
+
+  const prefixes = new Set(["un-","sub-","con-","in-","mis-","de-","re-",
+    "pro-","pre-","be-"]);
+
+  const suffixes = new Set(["-es","-less","-ness","-ment","-ful","-ish","-en",
+    "-tion","-sion","-ed","-ic","-ing"]);
+
   const magicE = new Set(["*e","a_e","e_e","i_e","o_e","u_e","y_e"]);
-  const yEndings = new Set(["-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy","-py","-sy","-ty"]);
-  const leSyllables = new Set(["-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle"]);
+  const yEndings = new Set(["-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy",
+    "-py","-sy","-ty"]);
+  const leSyllables = new Set(["-ble","-cle","-dle","-fle","-gle","-kle",
+    "-ple","-tle","-zle"]);
   const oddballs = new Set(["y","-ild","-old","-olt","-ind","augh","ough"]);
 
-  // initialize groups arrays
-  groups = [];
-  for (let i = 0; i < CATEGORY_COUNT; i++) groups.push([]);
+  groups = Array.from({length: CATEGORY_COUNT}, () => []);
 
-  // assign each base shape
   for (let s of baseShapes) {
-    const lbl = s.label.toLowerCase();
+    const lbl = s.label.toLowerCase().replace(/_/g, "").replace(/-/g, "");
 
     let g = null;
 
-    // 1 Single letters
     if (singleLetters.has(lbl)) g = 0;
-
-    // 2 Digraphs
-    else if (digraphs.has(lbl.replace('-', ''))) g = 1;
-
-    // 3 L blends
-    else if (lBlends.has(lbl)) g = 2;
-
-    // 4 R blends
-    else if (rBlends.has(lbl)) g = 3;
-
-    // 5 S blends
-    else if (sBlends.has(lbl)) g = 4;
-
-    // 6 3-letter blends
-    else if (threeLetter.has(lbl)) g = 5;
-
-    // 7 W blends
-    else if (wBlends.has(lbl)) g = 6;
-
-    // 8 vowel teams group 1
-    else if (vowelTeam1.has(lbl.replace('-', '').replace('_',''))) g = 7;
-
-    // 9 vowel teams group 2 (long/odd)
-    else if (vowelTeam2.has(lbl.replace('-', '').replace('_',''))) g = 8;
-
-    // 10 r-controlled
-    else if (rControl.has(lbl.replace('-', ''))) g = 9;
-
-    // 11 -ng / -nk family
-    else if (ngnk.has(lbl)) g = 10;
-
-    // 12 final consonant clusters
-    else if (finalClusters.has(lbl)) g = 11;
-
-    // 13 prefixes
-    else if (prefixes.has(lbl)) g = 12;
-
-    // 14 suffixes
-    else if (suffixes.has(lbl)) g = 13;
-
-    // 15 magic-e
-    else if (magicE.has(lbl)) g = 14;
-
-    // 16 y-endings
-    else if (yEndings.has(lbl)) g = 15;
-
-    // 17 oddballs & misc (catch)
-    else if (oddballs.has(lbl)) g = 16;
-
-    // 18 -le syllables
-    else if (leSyllables.has(lbl)) g = 17;
-
-    // fallback heuristics if still null
-    if (g === null) {
-      if (lbl.startsWith("bl")||lbl.startsWith("cl")||lbl.startsWith("fl")||lbl.startsWith("gl")||lbl.startsWith("pl")||lbl.startsWith("sl")) g = 2;
-      else if (lbl.startsWith("br")||lbl.startsWith("cr")||lbl.startsWith("dr")||lbl.startsWith("fr")||lbl.startsWith("gr")||lbl.startsWith("pr")||lbl.startsWith("tr")) g = 3;
-      else if (lbl.startsWith("sc")||lbl.startsWith("sk")||lbl.startsWith("sm")||lbl.startsWith("sn")||lbl.startsWith("sp")||lbl.startsWith("st")) g = 4;
-      else if (lbl.includes("ing") || lbl.includes("tion") || lbl.startsWith("-") || lbl.endsWith("-")) g = 13;
-      else g = 16;
-    }
+    else if (digraphs.has(lbl)) g = 1;
+    else if (lBlends.has(s.label)) g = 2;
+    else if (rBlends.has(s.label)) g = 3;
+    else if (sBlends.has(s.label)) g = 4;
+    else if (threeLetter.has(s.label)) g = 5;
+    else if (wBlends.has(s.label)) g = 6;
+    else if (vowelTeam1.has(lbl)) g = 7;
+    else if (vowelTeam2.has(lbl)) g = 8;
+    else if (rControl.has(lbl)) g = 9;
+    else if (ngnk.has(s.label)) g = 10;
+    else if (finalClusters.has(s.label)) g = 11;
+    else if (prefixes.has(s.label)) g = 12;
+    else if (suffixes.has(s.label)) g = 13;
+    else if (magicE.has(s.label)) g = 14;
+    else if (yEndings.has(s.label)) g = 15;
+    else if (oddballs.has(s.label)) g = 16;
+    else if (leSyllables.has(s.label)) g = 17;
+    else g = 16;
 
     s.groupIndex = g;
     groups[g].push(s);
   }
 
-  // assign colors per rule: vowels and vowel-teams (groups 0 single vowels + 7 & 8 vowel teams) = lightyellow
-  // prefixes (12) and suffixes (13) = lightgreen
+  // --- colors
   for (let s of baseShapes) {
     const g = s.groupIndex;
-    // single-letter vowels (group 0 but only a,e,i,o,u,y)
-    if (g === 0 && /^(a|e|i|o|u|y)$/.test(s.label.toLowerCase())) {
-      s.originalColor = 'lightyellow';
-    }
-    // vowel team groups
-    else if (g === 7 || g === 8) {
-      s.originalColor = 'lightyellow';
-    }
-    // magic-e patterns also vowel-related -> yellow
-    else if (g === 14) {
-      s.originalColor = 'lightyellow';
-    }
-    // prefixes / suffixes green
-    else if (g === 12 || g === 13) {
-      s.originalColor = 'lightgreen';
-    } else {
-      s.originalColor = 'white';
-    }
+    if (g === 0 && /^[aeiouy]$/.test(s.label)) s.originalColor = "lightyellow";
+    else if (g === 7 || g === 8 || g === 14) s.originalColor = "lightyellow";
+    else if (g === 12 || g === 13) s.originalColor = "lightgreen";
+    else s.originalColor = "white";
     s.color = s.originalColor;
   }
 }
 
-// --- layout: center each group in its own block; groups stack vertically with spacing
+// -----------------------------------------
+// --- NEW MULTI-BLOCK ROW LAYOUT + BORDERS
+// -----------------------------------------
 function layoutGroups() {
   calculateScale();
 
   const rowPlan = [
-    [0, 1],             
-    [2, 3, 4],          
-    [7, 8],             
-    [12, 13],           
+    [0, 1],
+    [2, 3, 4],
+    [7, 8],
+    [12, 13],
     [5, 6, 9, 10, 11, 14, 15, 16, 17]
   ];
 
@@ -287,10 +243,9 @@ function layoutGroups() {
     let blocks = [];
     let totalRowWidth = 0;
 
-    // --- First pass: compute each block width ---
+    // --- First pass: measure each block ---
     for (let gi of row) {
       const items = groups[gi] || [];
-
       const maxCols = max(1, floor((availableW * 0.9 + tileGap) / (baseTileW + tileGap)));
       const cols = min(items.length, maxCols);
       const rowsNeeded = items.length ? ceil(items.length / cols) : 0;
@@ -307,11 +262,11 @@ function layoutGroups() {
     let startX = leftMargin + (availableW - totalRowWidth) / 2;
     let blockX = startX;
 
-    // --- Second pass: draw blocks + place tiles ---
+    // --- Second pass: draw blocks and position tiles ---
     for (let block of blocks) {
       const { items, width, height, rows } = block;
 
-      // --- Draw border around this block ---
+      // BORDER
       if (items.length > 0) {
         stroke(200);
         strokeWeight(2);
@@ -325,7 +280,7 @@ function layoutGroups() {
         );
       }
 
-      // --- Place tiles inside block ---
+      // TILE PLACEMENT
       if (items.length > 0) {
         const maxCols = max(1, floor((availableW * 0.9 + tileGap) / (baseTileW + tileGap)));
         const cols = min(items.length, maxCols);
@@ -368,6 +323,10 @@ function layoutGroups() {
   shapes = baseShapes.map(b => ({ ...b }));
 }
 
+// -----------------------------------------
+// --- DRAW LOOP ---------------------------
+// -----------------------------------------
+
 function draw() {
   background(245);
 
@@ -385,14 +344,14 @@ function draw() {
     text("🧱 Click letters to build a word", buildArea.x + buildArea.w / 2, buildArea.y + buildArea.h / 2);
   }
 
-  // animate tiles
+  // animate
   for (let s of shapes) {
     s.x = lerp(s.x, s.targetX, 0.15);
     s.y = lerp(s.y, s.targetY, 0.15);
-    s.scale = lerp(s.scale === undefined ? 1 : s.scale, s.targetScale === undefined ? 1 : s.targetScale, 0.15);
+    s.scale = lerp(s.scale, s.targetScale, 0.15);
   }
 
-  // draw shapes (base + clones)
+  // draw shapes
   for (let s of shapes) {
     fill(s.color || "white");
     stroke(200);
@@ -403,26 +362,28 @@ function draw() {
     text(s.label, s.x + (s.w * s.scale) / 2, s.y + (s.h * s.scale) / 2);
   }
 
-  // arrange in box if needed
   arrangeShapesInBox();
+}
 
-// --- click handling (topmost-first)
+// -----------------------------------------
+// --- INPUT HANDLING ----------------------
+// -----------------------------------------
+
 function mousePressed() {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i];
-    const sw = s.w * (s.scale || 1);
-    const sh = s.h * (s.scale || 1);
+    const sw = s.w * s.scale;
+    const sh = s.h * s.scale;
+
     if (mouseX > s.x && mouseX < s.x + sw && mouseY > s.y && mouseY < s.y + sh) {
       if (s.isBase) {
-        // create clone (inBox)
         const clone = {
           label: s.label,
           w: s.w, h: s.h,
-          x: s.homeX,
-          y: s.homeY,
+          x: s.homeX, y: s.homeY,
           homeX: s.homeX, homeY: s.homeY,
           targetX: s.homeX, targetY: s.homeY,
-          color: 'lightyellow', // will be kept for vowels; arrangeShapesInBox may set
+          color: "lightyellow",
           originalColor: s.originalColor,
           isBase: false,
           inBox: true,
@@ -434,7 +395,6 @@ function mousePressed() {
         arrangeShapesInBox();
         return;
       } else {
-        // remove clone
         shapes.splice(i, 1);
         arrangeShapesInBox();
         return;
@@ -443,12 +403,16 @@ function mousePressed() {
   }
 }
 
-// --- arrange clicked shapes into build area (preserve click order)
+// -----------------------------------------
+// --- WORD BOX LAYOUT ---------------------
+// -----------------------------------------
+
 function arrangeShapesInBox() {
-  const inBox = shapes.filter(s => s.inBox).sort((a, b) => a.clickIndex - b.clickIndex);
+  const inBox = shapes
+    .filter(s => s.inBox)
+    .sort((a, b) => a.clickIndex - b.clickIndex);
 
   if (inBox.length === 0) {
-    // return base tiles to home
     for (let s of shapes) {
       if (s.isBase) {
         s.targetX = s.homeX;
@@ -460,33 +424,31 @@ function arrangeShapesInBox() {
     return;
   }
 
-  // compute fit width inside buildArea
   const spacing = max(8 * scaleFactor, 8);
-  // letter width target: try to fit reasonably
-  const maxLetterW = min(160 * scaleFactor, buildArea.w / max(1, inBox.length) * 0.9);
+  const maxLetterW = min(160 * scaleFactor, buildArea.w / inBox.length * 0.9);
   const letterW = max(40 * scaleFactor, maxLetterW);
   const totalW = inBox.length * letterW + (inBox.length - 1) * spacing;
+
   let startX = buildArea.x + (buildArea.w - totalW) / 2;
   const centerY = buildArea.y + buildArea.h / 2;
 
   let x = startX;
   for (let t of inBox) {
     t.targetX = x;
-    t.targetY = centerY - (t.h * t.targetScale || t.h * 1.5) / 2;
-    // ensure clones color follow vowel/prefix/suffix rules
-    // find base originalColor if exists
+    t.targetY = centerY - (t.h * t.targetScale) / 2;
+
     const base = baseShapes.find(b => b.label === t.label);
-    if (base) {
-      // if base originalColor exists, use it for clone background
-      t.color = (base.originalColor === 'lightgreen' || base.originalColor === 'lightyellow') ? base.originalColor : 'lightyellow';
+    if (base && (base.originalColor === "lightyellow" || base.originalColor === "lightgreen")) {
+      t.color = base.originalColor;
     } else {
-      t.color = 'lightyellow';
+      t.color = "lightyellow";
     }
+
     t.targetScale = min(2.0, (buildArea.h / t.h) * 0.9);
+
     x += letterW + spacing;
   }
 
-  // base tiles return to home
   for (let s of shapes) {
     if (s.isBase) {
       s.targetX = s.homeX;
@@ -497,7 +459,10 @@ function arrangeShapesInBox() {
   }
 }
 
-// --- word composition (ordered by clickIndex)
+// -----------------------------------------
+// --- UTILITIES ---------------------------
+// -----------------------------------------
+
 function getCurrentWord() {
   return shapes
     .filter(s => s.inBox)
@@ -506,12 +471,9 @@ function getCurrentWord() {
     .join("");
 }
 
-// --- reset
 function resetShapes() {
-  // remove clones, keep base shapes
   shapes = baseShapes.map(b => ({ ...b }));
   nextClickIndex = 0;
-  // restore visual properties
   for (let s of shapes) {
     s.inBox = false;
     s.color = s.originalColor;
