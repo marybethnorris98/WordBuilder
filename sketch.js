@@ -80,8 +80,14 @@ function windowResized() {
   shapes = baseShapes.map(b => ({ ...b }));
 
 function positionResetButton() {
-  const btnX = buildArea.x + SAFE_MARGIN;
-  const btnY = buildArea.y + buildArea.h + 20 + SAFE_MARGIN;
+  const scaledX = buildArea.x * scaleFactor;
+  const scaledY = buildArea.y * scaleFactor;
+  const scaledW = buildArea.w * scaleFactor;
+  const scaledH = buildArea.h * scaleFactor;
+
+  // Center under the white box
+  const btnX = scaledX + scaledW / 2 - resetButton.width / 2;
+  const btnY = scaledY + scaledH + 20;  // 20px under the box
 
   resetButton.position(btnX, btnY);
 }
