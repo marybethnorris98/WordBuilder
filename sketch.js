@@ -1,3 +1,5 @@
+// Modern Soft themed Word Builder (full file)
+// Pastel colors: vowels #FFF7C8, prefixes/suffixes #E6F6DF, others #FFFFFF
 let baseShapes = [];   // master unique tiles (objects)
 let shapes = [];       // runtime array (base tiles first, clones appended)
 let groups = [];       // CATEGORY_COUNT groups arrays of baseShapes references
