@@ -15,7 +15,7 @@ const tileShadowOffset = 4;
 
 // design reference
 const DESIGN_W = 1600;
-const DESIGN_H = 1400;
+const DESIGN_H = 2000;
 const CATEGORY_COUNT = 18;
 const SAFE_MARGIN = 50;
 
@@ -290,7 +290,7 @@ function layoutGroups() {
 
   // adjustable spacing
   const BIG_GAP = 100;               // gap below top buttons
-  const BOTTOM_MARGIN = 450 * scaleFactor; // safe space at bottom
+  const BOTTOM_MARGIN = 250 * scaleFactor; // safe space at bottom
 
   // --- row plan (your chosen grouping) ---
   const rowPlan = [
