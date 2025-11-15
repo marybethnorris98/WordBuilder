@@ -1,38 +1,36 @@
-let baseShapes = [];
-let shapes = [];
-let groups = [];
+let baseShapes = [];   // master unique tiles (objects)
+let shapes = [];       // runtime array (base tiles first, clones appended)
+let groups = [];       // CATEGORY_COUNT groups arrays of baseShapes references
 let nextClickIndex = 0;
-
 let resetButton, checkButton, defineButton;
 let buildArea;
-
 let scaleFactor = 1;
 
-const backgroundColor = "#FAF8F0";
-const buildAreaColor  = "rgba(255,255,255,0.95)";
-const tileShadowColor = "rgba(0,0,0,0.12)";
+// THEME / COLORS
+const backgroundColor = "#FAF8F0";          // warm off-white
+const buildAreaColor  = "rgba(255,255,255,0.95)"; // slightly translucent white
+const tileShadowColor = "rgba(0,0,0,0.12)";  // subtle shadow
 const tileCorner = 12;
 const tileShadowOffset = 4;
 
+// design reference
 const DESIGN_W = 1600;
 const DESIGN_H = 1400;
 const CATEGORY_COUNT = 18;
 const SAFE_MARGIN = 50;
 
+// NOTE: preload left blank for CORS safety
 function preload() {}
 
-//
-// -------------------- SETUP --------------------
-//
 function setup() {
   createCanvas(windowWidth, windowHeight);
+
   textAlign(CENTER, CENTER);
   rectMode(CORNER);
   noStroke();
 
-  // correct order:
-  createBaseShapesFromFullList();     // 1
-  categorizeBaseShapes();             // 2
+  createBaseShapesFromFullList();
+  categorizeBaseShapes();
   calculateScale();
 
   buildArea = {
@@ -42,16 +40,25 @@ function setup() {
     h: constrain(120 * scaleFactor, 80, 200)
   };
 
-  setupButtons();
-  layoutGroups();                     // 3 (AFTER categorize + scale)
-  shapes = baseShapes.map(b => ({ ...b }));  // 4
-  syncInitialPositions();             // 5
+  // Buttons  
+  resetButton = createButton("🔄 Reset");
+  styleAppButton(resetButton);
+  resetButton.mousePressed(resetShapes);
+
+  checkButton = createButton("✔️ Check Word");
+  styleAppButton(checkButton);
+  checkButton.mousePressed(checkWord);
+
+  defineButton = createButton("📘 Definition");
+  styleAppButton(defineButton);
+  defineButton.mousePressed(showDefinition);
+
+  layoutGroups();
+  shapes = baseShapes.map(b => ({ ...b }));
+
   schedulePositionButtons();
 }
 
-//
-// -------------------- RESIZE --------------------
-//
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   calculateScale();
@@ -61,30 +68,14 @@ function windowResized() {
   buildArea.w = width - SAFE_MARGIN * 2;
   buildArea.h = constrain(120 * scaleFactor, 80, 200);
 
-  // do NOT rebuild/touch base shapes or categorize again
-  layoutGroups();                       // recompute home positions
-
+  categorizeBaseShapes();
+  layoutGroups();
   shapes = baseShapes.map(b => ({ ...b }));
-  syncInitialPositions();
   schedulePositionButtons();
 }
 
-//
-// -------------------- BUTTONS --------------------
-//
-function setupButtons() {
-  resetButton  = createButton("🔄 Reset");
-  checkButton  = createButton("✔️ Check Word");
-  defineButton = createButton("📘 Definition");
-
-  [resetButton, checkButton, defineButton].forEach(styleAppButton);
-
-  resetButton.mousePressed(resetShapes);
-  checkButton.mousePressed(checkWord);
-  defineButton.mousePressed(showDefinition);
-}
-
 function styleAppButton(btn) {
+  if (!btn) return;
   btn.style("font-family", "system-ui");
   btn.style("font-size", "16px");
   btn.style("padding", "8px 12px");
@@ -96,9 +87,11 @@ function styleAppButton(btn) {
 }
 
 function schedulePositionButtons() {
-  requestAnimationFrame(positionButtons);
-  setTimeout(positionButtons, 60);
-  setTimeout(positionButtons, 250);
+  requestAnimationFrame(() => {
+    positionButtons();
+    setTimeout(positionButtons, 60);
+    setTimeout(positionButtons, 250);
+  });
 }
 
 function positionButtons() {
@@ -135,16 +128,14 @@ function calculateScale() {
   scaleFactor = min(width / DESIGN_W, height / DESIGN_H);
 }
 
-//
-// -------------------- SHAPE CREATION --------------------
-//
+// -----------------------------
+// Base shapes
+// -----------------------------
 function createBaseShapesFromFullList() {
   const raw = [
-    // letters
     "a","b","c","d","e","f","g","h","i","j","k","l","m",
     "n","o","p","q","r","s","t","u","v","w","x","y","z",
 
-    // digraphs
     "ch","sh","th","wh","qu","-ck","-s","-ff","-ll","-ss","-zz",
     "-ing","-ang","-ong","-ung","-ink","-ank","-onk","-unk",
     "bl-","cl-","fl-","gl-","pl-","sl-",
@@ -153,11 +144,9 @@ function createBaseShapesFromFullList() {
     "scr-","shr-","spl-","spr-","squ-","str-","thr-",
     "dw-","sw-","tw-",
 
-    // finals
     "-ld","-lf","-lk","-lp","-lt","-ct","-ft","-nt","-pt","-st","-xt",
     "-mp","-nd","-sk","-sp","-nch","-tch","-dge",
 
-    // vowels
     "ai","ea","oa","-ay","ee","-oe","ou","ow","oi","-oy","au","aw",
     "oo","eigh","ei","-ew","-ey","ie","igh","-ue","ui","oe","augh","ough",
 
@@ -165,26 +154,20 @@ function createBaseShapesFromFullList() {
 
     "er","ir","ur","ar","or","war","wor",
 
-    // prefixes
     "un-","sub-","con-","in-","mis-","de-","re-","pro-","pre-","be-",
 
-    // suffixes
     "-es","-less","-ness","-ment","-ful","-ish","-en","-tion","-sion",
     "-ed","-ic","-ing",
 
-    // y/ies
     "-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy","-py","-sy","-ty",
 
-    // le syllables
     "-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle",
 
-    // oddballs
     "ph","kn-","gn","wr-","-mb","-mn"
   ];
 
   const seen = new Set();
   const uniq = [];
-
   for (let t of raw) {
     if (!seen.has(t)) {
       seen.add(t);
@@ -198,8 +181,8 @@ function createBaseShapesFromFullList() {
     x: 0, y: 0,
     homeX: 0, homeY: 0,
     targetX: 0, targetY: 0,
-    color: "#fff",
-    originalColor: "#fff",
+    color: "#ffffff",
+    originalColor: "#ffffff",
     isBase: true,
     inBox: false,
     scale: 1,
@@ -209,9 +192,9 @@ function createBaseShapesFromFullList() {
   }));
 }
 
-//
-// -------------------- CATEGORIZATION --------------------
-//
+// -----------------------------
+// Categorize
+// -----------------------------
 function categorizeBaseShapes() {
   const singleLetters = new Set("abcdefghijklmnopqrstuvwxyz".split(""));
   const digraphs = new Set(["ch","sh","th","wh","qu","ph","tch","dge","ck","ff","ll","ss","zz","gn","kn","wr","mb","mn"]);
@@ -226,20 +209,21 @@ function categorizeBaseShapes() {
 
   const rControl = new Set(["er","ir","ur","ar","or","war","wor"]);
   const ngnk = new Set(["-ing","-ang","-ong","-ung","-ink","-ank","-onk","-unk"]);
-  const finals = new Set(["-ld","-lf","-lk","-lp","-lt","-ct","-ft","-nt","-pt","-st","-xt","-mp","-nd","-sk","-sp","-nch","-tch","-dge"]);
+  const finalClusters = new Set(["-ld","-lf","-lk","-lp","-lt","-ct","-ft","-nt","-pt","-st","-xt","-mp","-nd","-sk","-sp","-nch","-tch","-dge"]);
 
   const prefixes = new Set(["un-","sub-","con-","in-","mis-","de-","re-","pro-","pre-","be-"]);
   const suffixes = new Set(["-es","-less","-ness","-ment","-ful","-ish","-en","-tion","-sion","-ed","-ic","-ing"]);
 
   const magicE = new Set(["*e","a_e","e_e","i_e","o_e","u_e","y_e"]);
   const yEndings = new Set(["-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy","-py","-sy","-ty"]);
-  const leSyll = new Set(["-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle"]);
+  const leSyllables = new Set(["-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle"]);
+  const oddballs = new Set(["y","-ild","-old","-olt","-ind","augh","ough"]);
 
-  groups = Array.from({ length: CATEGORY_COUNT }, () => []);
+  groups = Array.from({length: CATEGORY_COUNT}, () => []);
 
   for (let s of baseShapes) {
     const lbl = s.label.toLowerCase().replace(/_/g, "");
-    let g = 16;
+    let g = null;
 
     if (singleLetters.has(lbl)) g = 0;
     else if (digraphs.has(lbl)) g = 1;
@@ -252,82 +236,112 @@ function categorizeBaseShapes() {
     else if (vowelTeam2.has(lbl)) g = 8;
     else if (rControl.has(lbl)) g = 9;
     else if (ngnk.has(s.label)) g = 10;
-    else if (finals.has(s.label)) g = 11;
+    else if (finalClusters.has(s.label)) g = 11;
     else if (prefixes.has(s.label)) g = 12;
     else if (suffixes.has(s.label)) g = 13;
     else if (magicE.has(s.label)) g = 14;
     else if (yEndings.has(s.label)) g = 15;
-    else if (leSyll.has(s.label)) g = 17;
+    else if (oddballs.has(s.label)) g = 16;
+    else if (leSyllables.has(s.label)) g = 17;
+    else g = 16;
 
     s.groupIndex = g;
     groups[g].push(s);
   }
 
-  // soft color logic
-  const Y = "#fff7c8";
-  const G = "#e6f6df";
-  const W = "#ffffff";
+  const COLOR_YELLOW = "#fff7c8";
+  const COLOR_GREEN  = "#e6f6df";
+  const COLOR_WHITE  = "#ffffff";
 
   for (let s of baseShapes) {
     const g = s.groupIndex;
-
-    if (g === 0 && /^[aeiouy]$/.test(s.label)) s.originalColor = Y;
-    else if (g === 7 || g === 8 || g === 14) s.originalColor = Y;
-    else if (g === 12 || g === 13) s.originalColor = G;
-    else s.originalColor = W;
-
+    if (g === 0 && /^[aeiouy]$/.test(s.label)) s.originalColor = COLOR_YELLOW;
+    else if (g === 7 || g === 8 || g === 14) s.originalColor = COLOR_YELLOW;
+    else if (g === 12 || g === 13) s.originalColor = COLOR_GREEN;
+    else s.originalColor = COLOR_WHITE;
     s.color = s.originalColor;
   }
 }
 
-//
-// -------------------- LAYOUT --------------------
-//
+// -----------------------------
+// Layout: BLOCK WRAP
+// -----------------------------
 function layoutGroups() {
-  const startY = buildArea.y + buildArea.h + 80 * scaleFactor;
-  const rowGap  = 30 * scaleFactor;
-  const colGap  = 20 * scaleFactor;
-  const maxW    = width - SAFE_MARGIN;
+  calculateScale();
 
-  let y = startY;
+  const leftMargin = SAFE_MARGIN;
+  const maxRowWidth = width - SAFE_MARGIN * 2;
 
-  for (let g = 0; g < groups.length; g++) {
-    let x = SAFE_MARGIN;
+  const baseTileW = constrain(floor(70 * scaleFactor), 36, 140);
+  const baseTileH = constrain(floor(44 * scaleFactor), 24, 80);
+  const tileGap  = max(8 * scaleFactor, 6);
+  const blockGap = max(40 * scaleFactor, 24);
+  const rowGap   = max(30 * scaleFactor, 18);
 
-    for (let s of groups[g]) {
-      const w = s.w * scaleFactor;
-      const h = s.h * scaleFactor;
+  const BUTTON_OFFSET = 18;
+  const fallbackButtonHeight = 40;
 
-      if (x + w > maxW) {
-        x = SAFE_MARGIN;
-        y += h + rowGap;
-      }
+  let realButtonHeight = fallbackButtonHeight;
+  try {
+    if (resetButton?.elt?.offsetHeight) {
+      realButtonHeight = resetButton.elt.offsetHeight;
+    }
+  } catch(e){}
 
-      s.x = s.homeX = s.targetX = x;
-      s.y = s.homeY = s.targetY = y;
+  const BIG_GAP = 80; // <— YOUR REQUESTED GAP
 
-      x += w + colGap;
+  let y =
+    buildArea.y +
+    buildArea.h +
+    BUTTON_OFFSET +
+    realButtonHeight +
+    BIG_GAP;
+
+  // ⭐ REQUIRED FIX
+  let currentRowWidth = 0;
+
+  for (let gi = 0; gi < groups.length; gi++) {
+    const block = groups[gi];
+    if (!block.length) continue;
+
+    const blockWidth = block.length * baseTileW + (block.length - 1) * tileGap;
+
+    if (currentRowWidth > 0 && currentRowWidth + blockWidth > maxRowWidth) {
+      y += baseTileH + rowGap;
+      currentRowWidth = 0;
     }
 
-    y += 60 * scaleFactor;
+    let blockStartX = leftMargin + currentRowWidth;
+
+    for (let i = 0; i < block.length; i++) {
+      const s = block[i];
+
+      s.w = baseTileW;
+      s.h = baseTileH;
+      s.homeX = blockStartX + i * (baseTileW + tileGap);
+      s.homeY = y;
+
+      s.x = s.homeX;
+      s.y = s.homeY;
+      s.targetX = s.homeX;
+      s.targetY = s.homeY;
+      s.scale = 1;
+      s.targetScale = 1;
+      s.color = s.originalColor;
+      s.inBox = false;
+      s.isBase = true;
+    }
+
+    currentRowWidth += blockWidth + blockGap;
   }
+
+  shapes = baseShapes.map(b => ({ ...b }));
+  schedulePositionButtons();
 }
 
-function syncInitialPositions() {
-  for (let s of shapes) {
-    s.x = s.homeX;
-    s.y = s.homeY;
-    s.targetX = s.homeX;
-    s.targetY = s.homeY;
-    s.scale = 1;
-    s.targetScale = 1;
-    s.inBox = false;
-  }
-}
-
-//
-// -------------------- DRAW --------------------
-//
+// -----------------------------
+// Draw
+// -----------------------------
 function draw() {
   background(backgroundColor);
 
@@ -344,9 +358,9 @@ function draw() {
   }
 
   for (let s of shapes) {
-    s.x = lerp(s.x, s.targetX, 0.12);
-    s.y = lerp(s.y, s.targetY, 0.12);
-    s.scale = lerp(s.scale, s.targetScale, 0.12);
+    s.x = lerp(s.x, s.targetX, 0.15);
+    s.y = lerp(s.y, s.targetY, 0.15);
+    s.scale = lerp(s.scale, s.targetScale, 0.15);
   }
 
   for (let s of shapes) {
@@ -358,11 +372,10 @@ function draw() {
 
     push();
     fill(s.color);
-    rect(s.x, s.y, s.w * s.scale, s.h * s.scale,
-         tileCorner * scaleFactor);
+    rect(s.x, s.y, s.w * s.scale, s.h * s.scale, tileCorner * scaleFactor);
 
     fill("#282828");
-    textSize(s.h * s.scale * (s.inBox ? 0.75 : 0.58));
+    textSize(s.inBox ? s.h * s.scale * 0.82 : s.h * s.scale * 0.58);
     text(s.label, s.x + (s.w * s.scale)/2, s.y + (s.h * s.scale)/2);
     pop();
   }
@@ -370,9 +383,9 @@ function draw() {
   arrangeShapesInBox();
 }
 
-//
-// -------------------- MOUSE LOGIC --------------------
-//
+// -----------------------------
+// Click tiles
+// -----------------------------
 function mousePressed() {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i];
@@ -386,7 +399,7 @@ function mousePressed() {
         const clone = {
           label: s.label,
           w: s.w, h: s.h,
-          x: s.x, y: s.y,
+          x: s.homeX, y: s.homeY,
           homeX: s.homeX, homeY: s.homeY,
           targetX: s.homeX, targetY: s.homeY,
           color: s.originalColor,
@@ -410,13 +423,13 @@ function mousePressed() {
   }
 }
 
-//
-// -------------------- BUILD-AREA LAYOUT --------------------
-//
+// -----------------------------
+// Arrange in box
+// -----------------------------
 function arrangeShapesInBox() {
   const inBox = shapes
     .filter(s => s.inBox)
-    .sort((a, b) => (a.clickIndex || 0) - (b.clickIndex || 0));
+    .sort((a,b) => (a.clickIndex||0)-(b.clickIndex||0));
 
   if (inBox.length === 0) {
     for (let s of shapes) {
@@ -431,14 +444,9 @@ function arrangeShapesInBox() {
   }
 
   const spacing = max(8 * scaleFactor, 8);
-  const availableW = buildArea.w - spacing * (inBox.length - 1);
-  const rawW = availableW / inBox.length;
-
-  const tileMaxW = 160 * scaleFactor;
-  const tileMinW = 40 * scaleFactor;
-
-  const letterW = constrain(rawW, tileMinW, tileMaxW);
-  const totalW = inBox.length * letterW + spacing * (inBox.length - 1);
+  const maxLetterW = min(160 * scaleFactor, buildArea.w / inBox.length * 0.9);
+  const letterW = max(40 * scaleFactor, maxLetterW);
+  const totalW = inBox.length * letterW + (inBox.length - 1) * spacing;
   const startX = buildArea.x + (buildArea.w - totalW) / 2;
   const centerY = buildArea.y + buildArea.h / 2;
 
@@ -449,7 +457,7 @@ function arrangeShapesInBox() {
     t.targetY = centerY - (t.h * t.targetScale) / 2;
 
     const base = baseShapes.find(b => b.label === t.label);
-    t.color = base ? base.originalColor : "#fff";
+    t.color = base ? base.originalColor : "#ffffff";
 
     t.targetScale = min(2.0, (buildArea.h / t.h) * 0.9);
 
@@ -466,9 +474,6 @@ function arrangeShapesInBox() {
   }
 }
 
-//
-// -------------------- HELPERS --------------------
-//
 function getCurrentWord() {
   return shapes
     .filter(s => s.inBox)
@@ -477,6 +482,9 @@ function getCurrentWord() {
     .join("");
 }
 
+// -----------------------------
+// Reset
+// -----------------------------
 function resetShapes() {
   shapes = baseShapes.map(b => ({ ...b }));
   nextClickIndex = 0;
@@ -494,11 +502,12 @@ function resetShapes() {
   }
 
   schedulePositionButtons();
+  console.log("resetShapes(): cleared.");
 }
 
-//
-// -------------------- DICTIONARY --------------------
-//
+// -----------------------------
+// Dictionary API
+// -----------------------------
 async function checkWord() {
   const word = getCurrentWord().toLowerCase();
   if (!word) return alert("No word built.");
@@ -525,6 +534,7 @@ async function showDefinition() {
     const entry = json[0];
     const meaning = entry.meanings?.[0];
     const defObj = meaning?.definitions?.[0];
+
     const part = meaning?.partOfSpeech ? ` (${meaning.partOfSpeech})` : "";
     const definition = defObj?.definition || null;
     const example = defObj?.example ? `\n\nExample: "${defObj.example}"` : "";
