@@ -376,7 +376,7 @@ function layoutGroups() {
     // Move down for next row
     y += baseTileH + rowGap;
   }
-
+y += 150 * scaleFactor;
   // Overwrite shapes with base copies
   shapes = baseShapes.map(b => ({ ...b }));
 
