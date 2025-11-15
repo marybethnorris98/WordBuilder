@@ -284,10 +284,13 @@ function layoutGroups() {
 
   const BUTTON_OFFSET = 18;
   let buttonsH = 40;
-  try { if (resetButton?.elt?.offsetHeight) buttonsH = resetButton.elt.offsetHeight; } catch(e){}
+  try { 
+    if (resetButton?.elt?.offsetHeight) buttonsH = resetButton.elt.offsetHeight; 
+  } catch(e) {}
 
-  const BIG_GAP = 100;
-  const BOTTOM_MARGIN = 450 * scaleFactor; // desired safe margin from bottom
+  // adjustable spacing
+  const BIG_GAP = 100;               // gap below top buttons
+  const BOTTOM_MARGIN = 450 * scaleFactor; // safe space at bottom
 
   // --- row plan (your chosen grouping) ---
   const rowPlan = [
@@ -303,7 +306,9 @@ function layoutGroups() {
     [16, 17]         // part C
   ];
 
-  // 1) Compute each block size and row heights (measurement pass)
+  // ---------------------------------------------------------
+  // 1) MEASURE ROWS
+  // ---------------------------------------------------------
   const measuredRows = [];
   for (const row of rowPlan) {
     let blocks = [];
@@ -319,7 +324,6 @@ function layoutGroups() {
         continue;
       }
 
-      // choose columns so tiles don't exceed usableWidth (simple per-block heuristic)
       const colsPossible = max(1, floor((usableWidth + tileGap) / (tileW + tileGap)));
       const cols = min(count, colsPossible);
 
@@ -333,56 +337,65 @@ function layoutGroups() {
       maxBlockHeight = max(maxBlockHeight, height);
     }
 
-    // add gaps between blocks
     rowWidth += blockGap * (blocks.length - 1);
-
     measuredRows.push({ blocks, rowWidth, rowHeight: maxBlockHeight });
   }
 
-  // 2) compute total layout height
-  const rowsCount = measuredRows.length;
+  // ---------------------------------------------------------
+  // 2) TOTAL HEIGHT
+  // ---------------------------------------------------------
   let totalHeight = 0;
-  for (let i = 0; i < rowsCount; i++) {
+  for (let i = 0; i < measuredRows.length; i++) {
     totalHeight += measuredRows[i].rowHeight;
-    if (i < rowsCount - 1) totalHeight += rowGap;
+    if (i < measuredRows.length - 1) totalHeight += rowGap;
   }
 
-  // 3) compute desired startY, but clamp so bottom of layout >= BOTTOM_MARGIN
-  let desiredStartY = buildArea.y + buildArea.h + BUTTON_OFFSET + buttonsH + BIG_GAP;
-  
-  // The very lowest Y the layout is allowed to start:
-const lowestStartY = height - BOTTOM_MARGIN - totalHeight;
+  // ---------------------------------------------------------
+  // 3) COMPUTE FINAL START Y (BOTTOM MARGIN FIX)
+  // ---------------------------------------------------------
+  const desiredStartY = buildArea.y + buildArea.h + BUTTON_OFFSET + buttonsH + BIG_GAP;
 
-// Use desiredStartY unless it would push the layout below the bottom margin
-let finalStartY = min(desiredStartY, lowestStartY);
+  // cannot overlap build area
+  const minStartY = buildArea.y + buildArea.h + BUTTON_OFFSET + buttonsH + BIG_GAP;
 
-// Also ensure it never overlaps the build area
-const minStartY = buildArea.y + buildArea.h + BUTTON_OFFSET + buttonsH;
-finalStartY = max(finalStartY, minStartY);
+  // must leave bottom margin visible
+  const maxStartY = height - BOTTOM_MARGIN - totalHeight;
 
-  // 4) placement pass: place rows and blocks using finalStartY
+  let finalStartY;
+
+  if (minStartY <= maxStartY) {
+    // plenty of room → keep desired placement
+    finalStartY = min(max(desiredStartY, minStartY), maxStartY);
+  } else {
+    // layout too tall → bottom margin takes priority
+    finalStartY = maxStartY;
+  }
+
+  // ---------------------------------------------------------
+  // 4) PLACE ROWS AND TILES
+  // ---------------------------------------------------------
   let y = finalStartY;
+
   for (const measured of measuredRows) {
     const { blocks, rowWidth, rowHeight } = measured;
 
-    // center the row
     let x = leftMargin + (usableWidth - rowWidth) / 2;
 
     for (const b of blocks) {
       const { items, width, height, cols, rows } = b;
 
       if (!items || items.length === 0) {
-        x += blockGap; // keep spacing consistent
+        x += blockGap;
         continue;
       }
 
-      // place tiles inside this block, centered within block width
-      const colsUsed = cols || max(1, floor((usableWidth + tileGap) / (tileW + tileGap)));
+      const colsUsed = cols;
       let idx = 0;
 
       for (let r = 0; r < rows; r++) {
         const tilesInThisRow = min(colsUsed, items.length - r * colsUsed);
         const rowTilesWidth = tilesInThisRow * tileW + (tilesInThisRow - 1) * tileGap;
+
         const rowStartX = x + (width - rowTilesWidth) / 2;
 
         for (let c = 0; c < tilesInThisRow; c++) {
@@ -406,17 +419,16 @@ finalStartY = max(finalStartY, minStartY);
         }
       }
 
-      // step forward by block width + gap
       x += width + blockGap;
     }
 
-    // move down to next row
     y += rowHeight + rowGap;
   }
 
-  // finally refresh runtime shapes
+  // ---------------------------------------------------------
+  // 5) REFRESH SHAPES
+  // ---------------------------------------------------------
   shapes = baseShapes.map(b => ({ ...b }));
-
   schedulePositionButtons();
 }
 
