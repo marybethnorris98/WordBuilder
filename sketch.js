@@ -272,156 +272,117 @@ function categorizeBaseShapes() {
 function layoutGroups() {
   calculateScale();
 
-  //
-  // Your final row plan
-  //
-  const rowPlan = [
-    [0],          // single letters
-    [1],          // digraphs
+  const leftMargin   = SAFE_MARGIN;
+  const maxRowWidth  = width - SAFE_MARGIN * 2;
 
-    [2, 3, 4],    // l, r, s blends
+  const baseTileW = constrain(floor(70 * scaleFactor), 36, 140);
+  const baseTileH = constrain(floor(44 * scaleFactor), 24, 80);
 
-    [7],          // vowel teams 1
-    [8],          // vowel teams 2
+  const tileGap  = max(8 * scaleFactor, 6);
+  const rowGap   = max(20 * scaleFactor, 14);
+  const groupGap = max(80 * scaleFactor, 60); // big spacing between categories
 
-    [12],         // prefixes
-    [13],         // suffixes
-
-    [5, 6, 9, 10],   // row A of "everything else"
-    [11, 14, 15],    // row B of "everything else"
-    [16, 17]         // row C of "everything else"
-  ];
-
-  const leftMargin = SAFE_MARGIN;
-  const usableWidth = width - SAFE_MARGIN * 2;
-
-  const tileW = constrain(floor(70 * scaleFactor), 36, 140);
-  const tileH = constrain(floor(44 * scaleFactor), 24, 80);
-  const tileGap = max(8 * scaleFactor, 6);
-
-  const blockGap = 70 * scaleFactor;  // big gap between category blocks
-  const rowGap = max(40 * scaleFactor, 30);
-
-  // start Y under the build box + buttons
   const BUTTON_OFFSET = 18;
-  let buttonsH = 40;
-  try { if (resetButton?.elt?.offsetHeight) buttonsH = resetButton.elt.offsetHeight; } catch(e){}
+  const fallbackButtonHeight = 40;
+
+  let realButtonHeight = fallbackButtonHeight;
+  try {
+    if (resetButton?.elt?.offsetHeight) {
+      realButtonHeight = resetButton.elt.offsetHeight;
+    }
+  } catch(e){}
+
   const BIG_GAP = 80;
 
+  // Starting Y position for first row
   let y =
     buildArea.y +
     buildArea.h +
     BUTTON_OFFSET +
-    buttonsH +
+    realButtonHeight +
     BIG_GAP;
 
-  //
-  // --- MAIN ROW LOOP ---
-  //
-  for (let row of rowPlan) {
-    let blocks = [];
+  // ---------------------------
+  // Your requested row plan
+  // ---------------------------
+  const rowPlan = [
+    [0],          // Single letters
+    [1],          // Digraphs
+    [2, 3, 4],    // Blend groups
+    [7],          // vowel teams 1
+    [8],          // vowel teams 2
+    [12],         // prefixes
+    [13],         // suffixes
+    [5, 6, 9, 10],   // extra row 1
+    [11, 14, 15],    // extra row 2
+    [16, 17]         // extra row 3
+  ];
 
-    //
-    // First pass: measure the width/height of each block
-    //
-    for (let g of row) {
-      const items = groups[g] || [];
-      const count = items.length;
+  // ---------------------------
+  // BUILD EACH ROW FROM PLAN
+  // ---------------------------
+  for (const row of rowPlan) {
 
-      if (count === 0) {
-        blocks.push({ g, items, width: 0, height: 0, rows: 0, cols: 0 });
-        continue;
-      }
+    // Compute total width of row BEFORE placing tiles
+    let rowWidth = 0;
 
-      const cols = max(
-        1,
-        floor((usableWidth * 0.9 + tileGap) / (tileW + tileGap))
-      );
-      const width = min(count, cols) * (tileW + tileGap) - tileGap;
-      const rows = ceil(count / cols);
-      const height = rows * (tileH + tileGap) - tileGap;
+    for (const g of row) {
+      const block = groups[g];
+      if (!block?.length) continue;
 
-      blocks.push({ g, items, width, height, rows, cols });
+      const blockWidth =
+        block.length * baseTileW +
+        (block.length - 1) * tileGap;
+
+      rowWidth += blockWidth + groupGap;
     }
 
-    //
-    // Compute total width of this row
-    //
-    let totalW = 0;
-    for (let b of blocks) {
-      totalW += b.width;
-    }
-    totalW += blockGap * (blocks.length - 1);
+    if (rowWidth > 0) rowWidth -= groupGap; // remove extra gap at end
 
-    // center the row
-    let x = leftMargin + (usableWidth - totalW) / 2;
+    // CENTER THE WHOLE ROW
+    let x = leftMargin + (maxRowWidth - rowWidth) / 2;
 
-    //
-    // Place each block
-    //
-    for (let b of blocks) {
-      const { items, width, height } = b;
+    // PLACE ALL TILES IN THIS ROW
+    for (const g of row) {
+      const block = groups[g];
+      if (!block?.length) continue;
 
-      // draw a border around each block
-      if (items.length > 0) {
-        stroke(200);
-        strokeWeight(2);
-        noFill();
-        rect(
-          x - 10 * scaleFactor,
-          y - 10 * scaleFactor,
-          width + 20 * scaleFactor,
-          height + 20 * scaleFactor,
-          10 * scaleFactor
-        );
-        noStroke();
+      const blockWidth =
+        block.length * baseTileW +
+        (block.length - 1) * tileGap;
+
+      // tiles inside this category
+      let tileX = x;
+      for (const s of block) {
+        s.w = baseTileW;
+        s.h = baseTileH;
+        s.homeX = tileX;
+        s.homeY = y;
+        s.x = s.homeX;
+        s.y = s.homeY;
+        s.targetX = s.homeX;
+        s.targetY = s.homeY;
+        s.targetScale = 1;
+        s.scale = 1;
+        s.color = s.originalColor;
+        s.inBox = false;
+
+        tileX += baseTileW + tileGap;
       }
 
-      // tile placement inside block
-      let colCount = b.cols;
-      let idx = 0;
-
-      for (let r = 0; r < b.rows; r++) {
-        const tilesInRow = min(colCount, items.length - r * colCount);
-        const rowW = tilesInRow * (tileW + tileGap) - tileGap;
-        const rowX = x + (width - rowW) / 2;
-
-        for (let c = 0; c < tilesInRow; c++) {
-          const s = items[idx++];
-
-          s.w = tileW;
-          s.h = tileH;
-
-          s.homeX = rowX + c * (tileW + tileGap);
-          s.homeY = y + r * (tileH + tileGap);
-
-          s.x = s.homeX;
-          s.y = s.homeY;
-          s.targetX = s.homeX;
-          s.targetY = s.homeY;
-
-          s.scale = 1;
-          s.targetScale = 1;
-
-          s.color = s.originalColor;
-          s.inBox = false;
-          s.isBase = true;
-        }
-      }
-
-      x += width + blockGap;
+      x += blockWidth + groupGap;
     }
 
-    //
-    // Move Y down for next row
-    //
-    const maxBlockHeight = max(...blocks.map(b => b.height));
-    y += maxBlockHeight + rowGap;
+    // Move down for next row
+    y += baseTileH + rowGap;
   }
 
-  // refresh shapes array
+  // Overwrite shapes with base copies
   shapes = baseShapes.map(b => ({ ...b }));
+
+  schedulePositionButtons();
 }
+
 function draw() {
   background(backgroundColor);
 
