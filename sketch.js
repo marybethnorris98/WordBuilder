@@ -286,8 +286,8 @@ function layoutGroups() {
   let buttonsH = 40;
   try { if (resetButton?.elt?.offsetHeight) buttonsH = resetButton.elt.offsetHeight; } catch(e){}
 
-  const BIG_GAP = 80;
-  const BOTTOM_MARGIN = 250 * scaleFactor; // desired safe margin from bottom
+  const BIG_GAP = 100;
+  const BOTTOM_MARGIN = 450 * scaleFactor; // desired safe margin from bottom
 
   // --- row plan (your chosen grouping) ---
   const rowPlan = [
