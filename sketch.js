@@ -110,7 +110,7 @@ function positionButtons() {
   const totalW = wReset + wCheck + wDefine + gap * 2;
 
   const startX = areaX + (areaW - totalW) / 2;
-  const y = areaY + areaH + 18;
+  const y = areaY + areaH + 36;
 
   resetButton.position(startX, y);
   checkButton.position(startX + wReset + gap, y);
