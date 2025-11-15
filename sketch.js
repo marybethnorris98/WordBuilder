@@ -303,7 +303,24 @@ function layoutGroups() {
   // ---------------------------
   // CATEGORY-BY-CATEGORY LAYOUT
   // ---------------------------
+const rowPlan = [
+  [0],          // Single letters (a-z)
+  [1],          // Digraphs
 
+  [2, 3, 4],    // L-blends, R-blends, S-blends
+
+  [7],          // Vowel teams 1
+  [8],          // Vowel teams 2
+
+  [12],         // Prefixes
+  [13],         // Suffixes
+
+  // Everything else split into two rows
+  [5, 6, 9, 10],  
+  [11, 14, 15],
+  [16, 17]
+];
+  
   for (let gi = 0; gi < groups.length; gi++) {
     const block = groups[gi];
     if (!block.length) continue;
