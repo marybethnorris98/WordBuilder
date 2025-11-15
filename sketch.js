@@ -1,8 +1,3 @@
-//
-//  WordBuilder — Polished Layout Version (B)
-//  — cleaned, organized, responsive, no group labels —
-//
-
 let baseShapes = [];
 let shapes = [];
 let groups = [];
@@ -26,17 +21,20 @@ const SAFE_MARGIN = 50;
 
 function preload() {}
 
+//
+// -------------------- SETUP --------------------
+//
 function setup() {
   createCanvas(windowWidth, windowHeight);
   textAlign(CENTER, CENTER);
   rectMode(CORNER);
   noStroke();
 
-  createBaseShapesFromFullList();
-  categorizeBaseShapes();
+  // correct order:
+  createBaseShapesFromFullList();     // 1
+  categorizeBaseShapes();             // 2
   calculateScale();
 
-  // build area
   buildArea = {
     x: SAFE_MARGIN,
     y: SAFE_MARGIN,
@@ -44,27 +42,16 @@ function setup() {
     h: constrain(120 * scaleFactor, 80, 200)
   };
 
-  // buttons
-  resetButton  = createButton("🔄 Reset");
-  checkButton  = createButton("✔️ Check Word");
-  defineButton = createButton("📘 Definition");
-
-  [resetButton, checkButton, defineButton].forEach(styleAppButton);
-
-  resetButton.mousePressed(resetShapes);
-  checkButton.mousePressed(checkWord);
-  defineButton.mousePressed(showDefinition);
-
-  // layout tiles
-  layoutGroups();
-
-  // clone shapes array for runtime
-  shapes = baseShapes.map(b => ({ ...b }));
-
-  syncInitialPositions();
+  setupButtons();
+  layoutGroups();                     // 3 (AFTER categorize + scale)
+  shapes = baseShapes.map(b => ({ ...b }));  // 4
+  syncInitialPositions();             // 5
   schedulePositionButtons();
 }
 
+//
+// -------------------- RESIZE --------------------
+//
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   calculateScale();
@@ -74,13 +61,27 @@ function windowResized() {
   buildArea.w = width - SAFE_MARGIN * 2;
   buildArea.h = constrain(120 * scaleFactor, 80, 200);
 
-  categorizeBaseShapes();
-  layoutGroups();
+  // do NOT rebuild/touch base shapes or categorize again
+  layoutGroups();                       // recompute home positions
 
   shapes = baseShapes.map(b => ({ ...b }));
-
   syncInitialPositions();
   schedulePositionButtons();
+}
+
+//
+// -------------------- BUTTONS --------------------
+//
+function setupButtons() {
+  resetButton  = createButton("🔄 Reset");
+  checkButton  = createButton("✔️ Check Word");
+  defineButton = createButton("📘 Definition");
+
+  [resetButton, checkButton, defineButton].forEach(styleAppButton);
+
+  resetButton.mousePressed(resetShapes);
+  checkButton.mousePressed(checkWord);
+  defineButton.mousePressed(showDefinition);
 }
 
 function styleAppButton(btn) {
@@ -135,7 +136,7 @@ function calculateScale() {
 }
 
 //
-// Base shapes list
+// -------------------- SHAPE CREATION --------------------
 //
 function createBaseShapesFromFullList() {
   const raw = [
@@ -209,7 +210,7 @@ function createBaseShapesFromFullList() {
 }
 
 //
-// Categorization + coloring
+// -------------------- CATEGORIZATION --------------------
 //
 function categorizeBaseShapes() {
   const singleLetters = new Set("abcdefghijklmnopqrstuvwxyz".split(""));
@@ -233,7 +234,6 @@ function categorizeBaseShapes() {
   const magicE = new Set(["*e","a_e","e_e","i_e","o_e","u_e","y_e"]);
   const yEndings = new Set(["-by","-vy","-zy","-ky","-ly","-ny","-dy","-fy","-py","-sy","-ty"]);
   const leSyll = new Set(["-ble","-cle","-dle","-fle","-gle","-kle","-ple","-tle","-zle"]);
-  const oddballs = new Set(["y","-ild","-old","-olt","-ind","augh","ough"]);
 
   groups = Array.from({ length: CATEGORY_COUNT }, () => []);
 
@@ -263,7 +263,7 @@ function categorizeBaseShapes() {
     groups[g].push(s);
   }
 
-  // soft color rules
+  // soft color logic
   const Y = "#fff7c8";
   const G = "#e6f6df";
   const W = "#ffffff";
@@ -281,7 +281,7 @@ function categorizeBaseShapes() {
 }
 
 //
-// Tile layout (no group labels, polished spacing)
+// -------------------- LAYOUT --------------------
 //
 function layoutGroups() {
   const startY = buildArea.y + buildArea.h + 80 * scaleFactor;
@@ -298,7 +298,6 @@ function layoutGroups() {
       const w = s.w * scaleFactor;
       const h = s.h * scaleFactor;
 
-      // wrap to next row
       if (x + w > maxW) {
         x = SAFE_MARGIN;
         y += h + rowGap;
@@ -314,7 +313,6 @@ function layoutGroups() {
   }
 }
 
-// Ensure everything starts in the right place
 function syncInitialPositions() {
   for (let s of shapes) {
     s.x = s.homeX;
@@ -328,7 +326,7 @@ function syncInitialPositions() {
 }
 
 //
-// DRAW LOOP
+// -------------------- DRAW --------------------
 //
 function draw() {
   background(backgroundColor);
@@ -345,14 +343,12 @@ function draw() {
          buildArea.y + buildArea.h / 2);
   }
 
-  // smooth animation
   for (let s of shapes) {
     s.x = lerp(s.x, s.targetX, 0.12);
     s.y = lerp(s.y, s.targetY, 0.12);
     s.scale = lerp(s.scale, s.targetScale, 0.12);
   }
 
-  // draw shadows + tiles
   for (let s of shapes) {
     push();
     fill(tileShadowColor);
@@ -375,7 +371,7 @@ function draw() {
 }
 
 //
-// Click to clone/remove tiles
+// -------------------- MOUSE LOGIC --------------------
 //
 function mousePressed() {
   for (let i = shapes.length - 1; i >= 0; i--) {
@@ -387,7 +383,6 @@ function mousePressed() {
         mouseY > s.y && mouseY < s.y + sh) {
 
       if (s.isBase) {
-        // clone tile into build area
         const clone = {
           label: s.label,
           w: s.w, h: s.h,
@@ -407,7 +402,6 @@ function mousePressed() {
         arrangeShapesInBox();
         return;
       } else {
-        // remove tile
         shapes.splice(i, 1);
         arrangeShapesInBox();
         return;
@@ -417,7 +411,7 @@ function mousePressed() {
 }
 
 //
-// Arrange letters in build area
+// -------------------- BUILD-AREA LAYOUT --------------------
 //
 function arrangeShapesInBox() {
   const inBox = shapes
@@ -425,7 +419,6 @@ function arrangeShapesInBox() {
     .sort((a, b) => (a.clickIndex || 0) - (b.clickIndex || 0));
 
   if (inBox.length === 0) {
-    // reset bases
     for (let s of shapes) {
       if (s.isBase) {
         s.targetX = s.homeX;
@@ -463,7 +456,6 @@ function arrangeShapesInBox() {
     x += letterW + spacing;
   }
 
-  // reset unused base tiles
   for (let s of shapes) {
     if (s.isBase) {
       s.targetX = s.homeX;
@@ -475,7 +467,7 @@ function arrangeShapesInBox() {
 }
 
 //
-// Helpers
+// -------------------- HELPERS --------------------
 //
 function getCurrentWord() {
   return shapes
@@ -505,7 +497,7 @@ function resetShapes() {
 }
 
 //
-// Dictionary
+// -------------------- DICTIONARY --------------------
 //
 async function checkWord() {
   const word = getCurrentWord().toLowerCase();
