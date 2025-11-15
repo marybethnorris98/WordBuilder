@@ -266,101 +266,161 @@ function categorizeBaseShapes() {
 // -----------------------------
 // Layout: BLOCK WRAP
 // -----------------------------
+// -----------------------------
+// FIXED LAYOUT: CENTERED BLOCKS + ROWS
+// -----------------------------
 function layoutGroups() {
   calculateScale();
 
+  //
+  // Your final row plan
+  //
+  const rowPlan = [
+    [0],          // single letters
+    [1],          // digraphs
+
+    [2, 3, 4],    // l, r, s blends
+
+    [7],          // vowel teams 1
+    [8],          // vowel teams 2
+
+    [12],         // prefixes
+    [13],         // suffixes
+
+    [5, 6, 9, 10],   // row A of "everything else"
+    [11, 14, 15],    // row B of "everything else"
+    [16, 17]         // row C of "everything else"
+  ];
+
   const leftMargin = SAFE_MARGIN;
-  const maxRowWidth = width - SAFE_MARGIN * 2;
+  const usableWidth = width - SAFE_MARGIN * 2;
 
-  const baseTileW = constrain(floor(70 * scaleFactor), 36, 140);
-  const baseTileH = constrain(floor(44 * scaleFactor), 24, 80);
+  const tileW = constrain(floor(70 * scaleFactor), 36, 140);
+  const tileH = constrain(floor(44 * scaleFactor), 24, 80);
+  const tileGap = max(8 * scaleFactor, 6);
 
-  const tileGap  = max(8 * scaleFactor, 6);
-  const rowGap   = max(20 * scaleFactor, 14);
-  const groupGap = max(45 * scaleFactor, 30);
+  const blockGap = 70 * scaleFactor;  // big gap between category blocks
+  const rowGap = max(40 * scaleFactor, 30);
 
+  // start Y under the build box + buttons
   const BUTTON_OFFSET = 18;
-  const fallbackButtonHeight = 40;
-
-  let realButtonHeight = fallbackButtonHeight;
-  try {
-    if (resetButton?.elt?.offsetHeight) {
-      realButtonHeight = resetButton.elt.offsetHeight;
-    }
-  } catch(e){}
-
-  // Your requested big gap after the buttons
+  let buttonsH = 40;
+  try { if (resetButton?.elt?.offsetHeight) buttonsH = resetButton.elt.offsetHeight; } catch(e){}
   const BIG_GAP = 80;
 
-  // Starting Y position for first row of tiles
   let y =
     buildArea.y +
     buildArea.h +
     BUTTON_OFFSET +
-    realButtonHeight +
+    buttonsH +
     BIG_GAP;
 
-  // ---------------------------
-  // CATEGORY-BY-CATEGORY LAYOUT
-  // ---------------------------
-const rowPlan = [
-  [0],          // Single letters (a-z)
-  [1],          // Digraphs
+  //
+  // --- MAIN ROW LOOP ---
+  //
+  for (let row of rowPlan) {
+    let blocks = [];
 
-  [2, 3, 4],    // L-blends, R-blends, S-blends
+    //
+    // First pass: measure the width/height of each block
+    //
+    for (let g of row) {
+      const items = groups[g] || [];
+      const count = items.length;
 
-  [7],          // Vowel teams 1
-  [8],          // Vowel teams 2
-
-  [12],         // Prefixes
-  [13],         // Suffixes
-
-  // Everything else split into two rows
-  [5, 6, 9, 10],  
-  [11, 14, 15],
-  [16, 17]
-];
-  
-  for (let gi = 0; gi < groups.length; gi++) {
-    const block = groups[gi];
-    if (!block.length) continue;
-
-    let x = leftMargin;
-
-    for (let s of block) {
-      // WRAP TO NEW ROW IF TILE DOESN'T FIT
-      if (x + baseTileW > leftMargin + maxRowWidth) {
-        x = leftMargin;
-        y += baseTileH + rowGap;
+      if (count === 0) {
+        blocks.push({ g, items, width: 0, height: 0, rows: 0, cols: 0 });
+        continue;
       }
 
-      // Assign final positions to base shapes
-      s.w = baseTileW;
-      s.h = baseTileH;
-      s.homeX = x;
-      s.homeY = y;
+      const cols = max(
+        1,
+        floor((usableWidth * 0.9 + tileGap) / (tileW + tileGap))
+      );
+      const width = min(count, cols) * (tileW + tileGap) - tileGap;
+      const rows = ceil(count / cols);
+      const height = rows * (tileH + tileGap) - tileGap;
 
-      s.x = s.homeX;
-      s.y = s.homeY;
-      s.targetX = s.homeX;
-      s.targetY = s.homeY;
-      s.scale = 1;
-      s.targetScale = 1;
-      s.color = s.originalColor;
-      s.inBox = false;
-      s.isBase = true;
-
-      x += baseTileW + tileGap;
+      blocks.push({ g, items, width, height, rows, cols });
     }
 
-    // After each category → add vertical gap
-    y += baseTileH + groupGap;
+    //
+    // Compute total width of this row
+    //
+    let totalW = 0;
+    for (let b of blocks) {
+      totalW += b.width;
+    }
+    totalW += blockGap * (blocks.length - 1);
+
+    // center the row
+    let x = leftMargin + (usableWidth - totalW) / 2;
+
+    //
+    // Place each block
+    //
+    for (let b of blocks) {
+      const { items, width, height } = b;
+
+      // draw a border around each block
+      if (items.length > 0) {
+        stroke(200);
+        strokeWeight(2);
+        noFill();
+        rect(
+          x - 10 * scaleFactor,
+          y - 10 * scaleFactor,
+          width + 20 * scaleFactor,
+          height + 20 * scaleFactor,
+          10 * scaleFactor
+        );
+        noStroke();
+      }
+
+      // tile placement inside block
+      let colCount = b.cols;
+      let idx = 0;
+
+      for (let r = 0; r < b.rows; r++) {
+        const tilesInRow = min(colCount, items.length - r * colCount);
+        const rowW = tilesInRow * (tileW + tileGap) - tileGap;
+        const rowX = x + (width - rowW) / 2;
+
+        for (let c = 0; c < tilesInRow; c++) {
+          const s = items[idx++];
+
+          s.w = tileW;
+          s.h = tileH;
+
+          s.homeX = rowX + c * (tileW + tileGap);
+          s.homeY = y + r * (tileH + tileGap);
+
+          s.x = s.homeX;
+          s.y = s.homeY;
+          s.targetX = s.homeX;
+          s.targetY = s.homeY;
+
+          s.scale = 1;
+          s.targetScale = 1;
+
+          s.color = s.originalColor;
+          s.inBox = false;
+          s.isBase = true;
+        }
+      }
+
+      x += width + blockGap;
+    }
+
+    //
+    // Move Y down for next row
+    //
+    const maxBlockHeight = max(...blocks.map(b => b.height));
+    y += maxBlockHeight + rowGap;
   }
 
-  // Rebuild shapes array
+  // refresh shapes array
   shapes = baseShapes.map(b => ({ ...b }));
-
-  schedulePositionButtons();
 }
 function draw() {
   background(backgroundColor);
